@@ -176,8 +176,8 @@ step's state from receipt detail; no progress is stored.
 
 - What each step's screen contains; each screen has its own spec
   (receipts/participants-screen.md, receipts/guest-picks.md,
-  receipts/edit-screen.md, and the upload, picks and finalize screen specs
-  as they are written).
+  receipts/edit-screen.md, receipts/upload-screen.md, bills/split-screen.md,
+  and the finalize screen spec when it is written).
 - The picking/editing switch's API and data: receipts/guest-picks.md and
   bills/allocations.md, as updated for ADR-0017. The organizer row:
   receipts/participants.md, as updated for ADR-0018.
