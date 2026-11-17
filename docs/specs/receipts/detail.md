@@ -26,7 +26,8 @@ and inspect a finalized receipt without exposing internal parser/blob data.
   (null on receipts created before the organizer row), business/parse/split
   state, picksOpenedAt (null while editing; receipts/guest-picks.md),
   revision, review/finalization timestamps, merchant/address/purchase date,
-  currency, nullable amounts, creation/update times, participants and items.
+  currency, nullable amounts, creation/update times, participants, items and
+  the derived `totals` check (receipts/totals-check.md).
 - Participants include id, displayName, phone, email, joinedAt, hasPickLink
   and picksSubmittedAt (null until the guest presses done), ordered by
   joinedAt then id. This contact projection is organizer-only. hasPickLink is
