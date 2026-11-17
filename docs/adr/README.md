@@ -26,4 +26,4 @@ that supersedes the old one.
 | 0016 | [shadcn/ui as the interactive primitive layer](0016-shadcn-ui-primitives.md) | Accepted |
 | 0017 | [Group link with claimed names, and an owner switch between picking and editing](0017-group-pick-link.md) | Accepted |
 | 0018 | [The organizer on the roster, polling for picks, and one URL per receipt step](0018-organizer-row-polling-and-receipt-steps.md) | Accepted |
-| 0019 | [Owners can restore their soft-deleted receipts](0019-owner-receipt-restoration.md) | Proposed |
+| 0019 | [Owners can restore their soft-deleted receipts](0019-owner-receipt-restoration.md) | Accepted |
