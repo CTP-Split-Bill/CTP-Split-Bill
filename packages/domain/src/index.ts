@@ -11,5 +11,6 @@ export * from "./contact";
 export * from "./receipt-parsing";
 export * from "./picks";
 export * from "./receipt-summaries";
+export * from "./receipt-restoration";
 // export * from "./members";
 export * from "./steps";

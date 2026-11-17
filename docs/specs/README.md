@@ -44,6 +44,7 @@ Every feature template section is required. See ../../CONTRIBUTING.md.
 | [receipt upload](receipts/upload.md) | Validated photo upload and owned draft creation with failed-write cleanup |
 | [receipt detail](receipts/detail.md) | Owner-only receipt, participant and item projection |
 | [receipt corrections](receipts/edit.md) | Versioned metadata/money edits and review confirmation |
+| [receipt deletion and restoration](receipts/delete.md) | Owner-scoped visibility changes with preserved content, bills and tokens |
 | [receipt items](receipts/items.md) | Atomic corrected-item replacement and assignment cleanup |
 | [assignments](bills/allocations.md) | One-person item assignments and separate equal shared allocations |
 | [preview](bills/preview.md) | Read-only allocation breakdown for a stored draft revision |

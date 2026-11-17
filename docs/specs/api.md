@@ -16,8 +16,9 @@ detailed behavior; this page distinguishes implemented operations from scaffolds
   domain package, map errors and revalidate successful mutations.
 - Receipt.ownerId is the authorization boundary. Participant rows confer no
   access. The client never supplies ownership identity.
-- Reads and writes exclude deleted receipts. Foreign, unknown and deleted
-  resources return 404 without confirming their existence.
+- Reads and writes exclude deleted receipts, except the owner-only restore
+  operation (ADR-0019). Foreign, unknown and deleted resources return 404
+  without confirming their existence through ordinary operations.
 - Updates to existing drafts require expectedRevision. Creation starts at revision
   1. The receipt lock checks owner, DRAFT,
   non-PARSING state, picking paused and revision, then advances revision
@@ -25,6 +26,10 @@ detailed behavior; this page distinguishes implemented operations from scaffolds
   take no expectedRevision (receipts/guest-picks.md).
   Parsing additionally supports guarded recovery of an abandoned attempt after
   five minutes, as described in receipts/parse.md.
+- Soft deletion and restoration are visibility changes: they take no
+  expectedRevision and preserve revision in every receipt state. Restore alone
+  can clear an owned receipt's deletedAt; a live owned receipt returns 409
+  (receipts/delete.md).
 - Errors use { error: { code, message } }. Invalid JSON/input is 400; unknown
   user 401; absent/foreign 404; stale/state conflicts 409; unexpected failures
   generic 500. Receipt image storage failures return 503 with code INTERNAL and
@@ -47,6 +52,8 @@ detailed behavior; this page distinguishes implemented operations from scaffolds
 | GET | /api/receipts/[id]/image | Private original photo bytes after owner authorization | receipts/image.md |
 | POST | /api/receipts/[id]/parse | ParseReceipt; local OCR into unreviewed draft items and fields | receipts/parse.md |
 | PATCH | /api/receipts/[id] | UpdateReceipt; corrections, split mode or review confirmation; receipt detail | receipts/edit.md |
+| DELETE | /api/receipts/[id] | Soft-delete an owned live receipt; empty 204; revision and child rows unchanged | receipts/delete.md |
+| POST | /api/receipts/[id]/restore | Restore an owned deleted receipt; 200 existing ReceiptSummary; live owned receipt 409 | receipts/delete.md |
 | PUT | /api/receipts/[id]/items | ReplaceItems with expectedRevision; full replacement clears assignments/sharing/review | receipts/items.md |
 | PUT | /api/receipts/[id]/participants | ReplaceParticipants with expectedRevision and participants: [{id?, displayName?, phone?, email?}]; receipt detail | receipts/participants.md |
 | POST | /api/receipts/[id]/participants/[participantId]/pick-link | Issue or rotate a participant's pick link; `{ url }`, shown once | receipts/guest-picks.md |
@@ -79,6 +86,10 @@ Draft, pending review: totals on GET /api/receipts/[id]
 
 ## Verify
 
+- apps/web/tests/receipts-delete-route.test.ts checks soft deletion, authentication,
+  owner/deletion guards, preserved content and children, revalidation, concurrent
+  deletes/restores, late parsing completion, restoration rollback, and visibility
+  across a delete/restore cycle with unchanged guest tokens and bill snapshots.
 - apps/web/tests/me-route.test.ts checks exact own-profile reads, nullable
   fields, identity changes, fresh reads, authentication and generic failures.
 - pnpm test covers every implemented receipt/bill handler, including owner and
