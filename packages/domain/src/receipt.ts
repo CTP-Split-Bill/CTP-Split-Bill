@@ -1,5 +1,5 @@
-// Receipt corrections and reads. Ownership, revisions and review state are
-// checked in the same transaction as each draft mutation.
+// Receipt reads, corrections and soft deletion. Draft content mutations check
+// ownership/revision/review transactionally; deletion preserves content/revision.
 import { z } from "zod";
 import { prisma, type Prisma } from "@project/db";
 import { ApiError } from "./errors";
@@ -284,4 +284,18 @@ export async function createReceipt(
 export function organizerName(name: string | null): string {
   const trimmed = name?.trim().slice(0, 50).trim();
   return trimmed ? trimmed : "You";
+}
+
+export async function softDeleteReceipt(userId: string, receiptId:string){
+  await requireReceiptUser(userId);
+  const scope = receiptScope(userId, receiptId);
+
+  const result = await prisma.receipt.updateMany({
+    where: scope,
+    data: {deletedAt: new Date() },
+  });
+
+  if (result.count == 0){
+    throw new ApiError("NOT_FOUND", "Receipt not found", 404);
+  }
 }
