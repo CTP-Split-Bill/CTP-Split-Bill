@@ -14,8 +14,18 @@ what to pay without an account or a second link.
 ## Where it lives
 
 - packages/db/prisma/schema.prisma: Participant.pickTokenHash,
-  Participant.picksSubmittedAt and Receipt.picksOpenedAt, added by
+  Participant.picksSubmittedAt, Receipt.picksOpenedAt and the nullable unique
+  Receipt.groupTokenHash, added by
   append-only migrations.
+- packages/domain/src/group-links.ts: owner group-link issue/revoke, public
+  group projection, claim validation and the claim transaction.
+- apps/web/app/api/receipts/[id]/group-link/route.ts: owner POST and DELETE.
+- apps/web/app/api/groups/[token]/route.ts and claim/route.ts: anonymous GET
+  and POST claim, with no derived user identity.
+- apps/web/app/lib/page-access.ts: public `/g/` page-path exception.
+- apps/web/tests/group-links-route.test.ts: group API integration coverage.
+- apps/db-server/drills/group-links.ts and apps/web/drills/group-links.ts:
+  isolated PostgreSQL contention and live HTTP verification.
 - packages/domain/src/picks.ts: token issue/rotate/revoke, token lookup,
   ReplacePicks validation, reconcileHolderPicks (shared by guest and
   organizer picks), the pick transactions and the picking switch.
@@ -49,7 +59,9 @@ what to pay without an account or a second link.
   unknown receipts and participants. Both work on a receipt in any state, so
   the owner can still rotate or revoke after finalize. POST returns
   `{ url }` once, built from the request's origin as `<origin>/p/<token>`; the
-  raw token is never readable again. DELETE clears the hash and picksSubmittedAt, and is idempotent. Neither
+  raw token is never readable again. DELETE clears only the hash and is
+  idempotent; picks and picksSubmittedAt survive rotation and revocation
+  (ADR-0017). Neither
   changes the receipt revision, because receipt content is unchanged.
 - The organizer's own row (receipts/participants.md) never gets a link: POST
   for it returns 400 `INVALID_INPUT` and writes nothing. DELETE for it is the
@@ -103,6 +115,77 @@ what to pay without an account or a second link.
   ready when submitted, or when they have no link (the owner picks for them).
 - Finalization is not gated on readiness. Its existing completeness rules in
   bills/split-allocation.md still apply.
+
+### Group links and claims
+
+- The owner issues or rotates a group link with
+  `POST /api/receipts/[id]/group-link`. Each successful POST returns 200
+  `{ url: "<origin>/g/<token>" }` with `Cache-Control: no-store`. The token is
+  32 CSPRNG bytes encoded as 43 base64url characters; only its SHA-256 hex
+  hash is stored in `receipts.group_token_hash`. Existing receipts have null.
+  The raw token is returned once and never stored or logged.
+- Owner POST and DELETE require identity and ownership, exclude deleted
+  receipts, and work in every receipt state, including FINALIZED and PARSING.
+  Foreign, unknown or deleted receipts return 404. DELETE returns empty 204,
+  clears the group hash, and is idempotent. Rotation and revocation invalidate
+  the old group token without changing personal links, picks, done state,
+  picking mode or receipt revision.
+- `GET /api/groups/[token]` and `POST /api/groups/[token]/claim` are anonymous;
+  the group hash is their only access scope. Malformed tokens (anything other
+  than 43 base64url characters), unknown, rotated or revoked tokens, deleted
+  receipts and PARSING receipts all return 404 `NOT_FOUND`, "Link not found".
+  Tokens have no expiry. GET makes no database changes.
+- A DRAFT group GET returns exactly `status`, `merchantName`, `purchasedAt`,
+  `pickingOpen` and `participants`. Each participant has exactly `id`,
+  `displayName` and `claimed`; claimed is `pickTokenHash !== null`. The
+  organizerParticipantId row is omitted from this claim roster. Older
+  receipts with no organizerParticipantId include their full roster.
+  Participants are ordered by joinedAt then id. Nullable merchant/date values
+  remain null and dates serialize as ISO strings.
+- A FINALIZED group GET returns exactly `status`, `revision`, `merchantName`,
+  `purchasedAt`, `currency`, `items`, `paidBy` and `participants`. Items have
+  exactly `id`, `lineNumber`, `name`, `quantity`, `totalPrice` and `pickedBy`,
+  with the same serialization and ordering as a personal-link GET.
+  Participants include everyone, including the organizer, with exactly `id`,
+  `displayName`, `amountOwed` and `settled`. Amounts and settlement follow the
+  existing personal-link projection and bills/list.md; `paidBy` is the payer's
+  display name or null. There is no holder `participantId` or
+  `picksSubmittedAt`, and no claim roster in the finalized response.
+- Claim accepts JSON `{ participantId: string }`, validated by a shared
+  domain Zod schema: trimmed, nonempty, at most 200 characters. Invalid JSON
+  or input returns 400 in the normal error envelope. A successful claim
+  returns 200 `{ url: "<origin>/p/<personal-token>" }` once.
+- Claim first resolves the token, then takes the receipt row lock in a
+  transaction without advancing revision or requiring picking to be open.
+  Under the lock it rechecks the token, deletion and parsing state, then
+  rejects FINALIZED with 409 `CONFLICT`, "Receipt is finalized". A participant
+  outside the receipt or missing from it returns 404. The organizer row
+  returns 400 `INVALID_INPUT`, "You can't send yourself a pick link".
+- If the participant already holds a personal token, claim returns 409
+  `CONFLICT`, "Already claimed". Otherwise a conditional update scoped by
+  participant id, receipt id and null pickTokenHash stores a new personal
+  token hash; exactly one row must change. Two claims for one participant
+  produce one success and one 409. Claim preserves picks and done state,
+  changes no receipt revision or picking mode, and works in Editing and
+  Picking open. The personal token uses the existing ADR-0015 mechanism.
+- Group rotation/revocation uses the same receipt row lock. If it wins the
+  lock before a waiting claim, the old-token claim returns 404 and issues no
+  personal token. Participant replacement, parsing, deletion and finalization
+  coordinate through that receipt row, so claim cannot issue an orphan token.
+- Existing personal-link issue makes a name claimed; personal rotation keeps
+  it claimed. Personal revocation releases it, and the next group GET reports
+  claimed false. Reclaim creates a fresh personal token while retaining that
+  participant's picks and done state; the revoked token remains invalid.
+- Group GET and claim use `Cache-Control: no-store`,
+  `Referrer-Policy: no-referrer` and `X-Robots-Tag: noindex` on successes and
+  errors, and force dynamic handling. Explicit selections and serialization
+  exclude contacts, owner identity, image/blob fields, extraction, token
+  hashes and raw tokens from GET. Claim returns only its personal URL.
+- Owner receipt detail exposes `hasGroupLink` derived from the hash, never
+  the hash itself. The `/g/` path prefix is public for signed-out visitors;
+  `/groups`, `/group` and other protected page paths stay protected. The
+  `/g/[token]` page and sharing controls are separate UI work.
+
 ### Picking and editing
 
 - A DRAFT receipt is in one of two modes (ADR-0017), stored as
@@ -179,9 +262,52 @@ what to pay without an account or a second link.
 | Organizer PUTs their picks while picking is open | Saved; revision advances |
 | Pause picking after Maya pressed done | Maya's picks and done state kept |
 | Owner requests a pick link for their own row | 400 |
+| Group link opened while Editing | Unclaimed guest roster, pickingOpen false, no write |
+| Two guests claim Maya at the same time | One personal URL; the other gets 409 Already claimed |
+| Group claim names the organizer | 400, no personal token issued |
+| Owner revokes Maya's personal link, then Maya reclaims | Old personal token 404; fresh token; picks and done state kept |
+| Owner rotates the group link after Maya claims | Old group token 404; Maya's personal token still works |
+| Finalized group link opened | Every participant's split, including the organizer; no holder identity |
+| Finalized receipt receives a claim | 409, nothing written |
 
 ## Verify
 
+- pnpm test (group-links-route.test.ts) covers owner authentication and scope,
+  issue/rotate/idempotent revoke in both draft modes and after finalize,
+  hash-only storage, the identical 404 family, read-only GET, exact draft and
+  finalized projections, organizer exclusion/rejection, malformed claim input,
+  foreign participants, repeated and parallel claims, revision preservation,
+  privacy and all guest response headers. Existing personal-link issue,
+  rotation, release and reclaim preserve picks/done and report claimed state.
+- Receipt detail tests cover hasGroupLink on both sides of issuance/revocation
+  and absence of groupTokenHash from every receiptDetail response. Page-access
+  tests allow signed-out `/g/<token>` while protecting unrelated paths.
+- Migration verification applies the new SQL to existing receipt fixtures,
+  confirms null defaults and preserved content, permits multiple null hashes,
+  and rejects duplicate non-null hashes.
+- API drill (pnpm dev, owner session): POST the group-link route, anonymously
+  GET the roster, claim a guest, and GET the returned personal token. A repeat
+  claim returns 409. Rotate the group link: old group GET is 404 while the
+  personal token still works. Pause picking, finalize normally, then confirm
+  current group GET returns the split and claim returns 409. Inspect response
+  bodies and headers for privacy and cache/referrer/index protection.
+- `pnpm --filter @project/db-server exec tsx drills/group-links.ts` runs the
+  lock and live HTTP drills against an isolated temporary PostgreSQL cluster
+  after `pnpm build`. It uses installed embedded-postgres binaries, applies
+  the same migrations, starts the built Next server on a temporary port with
+  an isolated database session, and stops both servers and removes temporary
+  data on completion. It does not open the development cluster or a shared
+  database. Raw credentials are not printed.
+- Append `--dev` to the isolated drill command to exercise the same HTTP flow
+  under `next dev --turbopack`, including absence of tokens from request logs.
+- Lock drill uses an isolated local PostgreSQL database with independent
+  connections, separate from the service-free PGlite suite. Pause a claim
+  behind a held receipt lock; queue owner rotation or revocation ahead of it
+  and observe both blocked updates through pg_stat_activity. Release the
+  lock, then assert claim returns 404 and stores no personal hash. Repeat for
+  rotation and revocation, and exercise the reverse
+  order where a committed claim survives a later group change. Parallel calls
+  on one PGlite connection do not establish PostgreSQL lock contention.
 - pnpm test covers token issue/rotate/revoke, hash-only storage, the 404
   family, reconciliation of individual and shared rows, mode transitions,
   concurrent guest saves all landing, rollback, the finalized split
@@ -220,6 +346,10 @@ deletes its line from this section.
   phone-first layout, and the private-window, phone and finalize drills are
   not yet true. `apps/web/middleware.ts` also redirects signed-out page
   requests to sign-in, so `/p/` must be exempted when the page lands.
+- **The group page and organizer sharing controls do not exist.** The group
+  API and public `/g/` path rule do not provide a working `/g/[token]` page.
+  Name confirmation, browser-local "Continue as" and sharing/claimed UI are
+  separate work; this feature's drill addresses the API directly.
 
 ## Constraints & decisions
 
@@ -238,6 +368,15 @@ deletes its line from this section.
   accepts that because names and amounts are low-sensitivity and revocation
   ends it.
 - Only hashes are stored, so a database read does not leak working links.
+- ADR-0017 adds the group token as a roster/claim credential; it never
+  authorizes picks. A claim uses a state-independent receipt lock because
+  lockReceiptForGuest requires Picking open and advances revision.
+- The draft roster omits the organizer because that row cannot hold a
+  personal token (ADR-0018). The finalized summary includes it so amounts
+  describe the whole split. A shared holder-independent finalized projection
+  keeps group and personal amount/settlement semantics aligned.
+- Personal revocation preserves done state as required by ADR-0017's recovery
+  flow; releasing a credential does not change the participant's picks.
 - Weighted portions are out; shared means equal, as in bills/allocations.md.
 - Picking and editing lock each other out (ADR-0017), so a guest save can't
   undo an owner's fix and an owner save is never stale because of a pick.
@@ -250,3 +389,5 @@ deletes its line from this section.
 - The app sending the link by SMS or email itself; the organizer sends it.
 - Guests marking their own bill paid; only the owner records payment.
 - Guests adding or editing items or other participants.
+- The `/g/[token]` page, confirmation, browser storage and organizer group
+  sharing controls; the group UI spec is not yet written.

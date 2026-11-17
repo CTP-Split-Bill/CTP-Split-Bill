@@ -18,6 +18,9 @@ Organizers need a private, persistent identity so receipt and bill data stays av
 
 ## Behavior
 - A signed-out visitor can view the landing page, `/login`, `/api/health`, and `/api/auth/*`.
+- Group page paths under `/g/` are public; the page itself is separate UI
+  work. Group GET/claim and personal pick-token APIs use token scope without
+  a session (see [guest picks](../receipts/guest-picks.md)).
 - `/login` shows one card, centered on the screen, titled "Sign in to Split Bill" with the message "You need to sign in with GitHub to continue." and a "Continue with GitHub" button. GitHub is the only provider offered.
 - Auth.js's built-in sign-in and error pages are replaced by `/login`: `/api/auth/signin` redirects there, and a failed sign-in returns there with `?error=<code>`. `AccessDenied` (no verified GitHub email) explains that a verified email is required; any other code shows "Sign-in didn't complete. Please try again." No other error detail is shown.
 - `/login?callbackUrl=<path>` returns the visitor to that path after sign-in. Only same-origin paths starting with a single `/` are honored; absolute URLs, protocol-relative URLs and `/login` itself fall back to `/`.

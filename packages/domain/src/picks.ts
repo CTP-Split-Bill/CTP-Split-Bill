@@ -3,7 +3,6 @@
 // guest side; no user identity is derived. See ADR-0015 and
 // docs/specs/receipts/guest-picks.md.
 
-import { createHash, randomBytes } from "node:crypto";
 import { z } from "zod";
 import { prisma, type Prisma } from "@project/db";
 import { ApiError } from "./errors";
@@ -13,21 +12,14 @@ import {
   receiptScope,
   requireReceiptUser,
 } from "./receipt-access";
-import { isBillSettled } from "./bills";
 import { presentReceipt, receiptDetail } from "./receipt";
-import { centsToMoney, toCents } from "./split";
+import { guestReceiptSelect, pickersOf, presentGuestReceipt } from "./guest-receipt";
+import { hashGuestToken, linkNotFound, newGuestToken, requireGuestToken } from "./guest-tokens";
 
 type Db = Pick<typeof prisma, "participant" | "receipt">;
 type Tx = Prisma.TransactionClient;
 
-// 32 random bytes in base64url is always 43 characters; anything else can't
-// be a token, so it 404s without touching the database.
-const TOKEN_SHAPE = /^[A-Za-z0-9_-]{43}$/;
-const linkNotFound = () => new ApiError("NOT_FOUND", "Link not found", 404);
-
-export function hashPickToken(token: string): string {
-  return createHash("sha256").update(token).digest("hex");
-}
+export const hashPickToken = hashGuestToken;
 
 // --- Owner side --------------------------------------------------------------
 
@@ -79,7 +71,7 @@ export async function issuePickLink(
       throw new ApiError("INVALID_INPUT", "You can't send yourself a pick link", 400);
     }
   }
-  const token = randomBytes(32).toString("base64url");
+  const token = newGuestToken();
   await setPickLink(userId, receiptId, participantId, {
     pickTokenHash: hashPickToken(token),
   });
@@ -93,7 +85,6 @@ export async function revokePickLink(
 ) {
   await setPickLink(userId, receiptId, participantId, {
     pickTokenHash: null,
-    picksSubmittedAt: null,
   });
 }
 
@@ -102,7 +93,7 @@ export async function revokePickLink(
 // Unknown, revoked, rotated, removed-participant, deleted-receipt and parsing
 // receipts all land on the same 404.
 async function findHolder(db: Db, token: unknown) {
-  if (typeof token !== "string" || !TOKEN_SHAPE.test(token)) throw linkNotFound();
+  requireGuestToken(token);
   const holder = await db.participant.findFirst({
     where: {
       pickTokenHash: hashPickToken(token),
@@ -121,42 +112,12 @@ async function findHolder(db: Db, token: unknown) {
 // Explicit projection: phones, emails, owner, blob names, extraction and
 // token hashes are never selected, so they cannot leak into a token response.
 const pickReceipt = {
-  status: true,
-  revision: true,
-  picksOpenedAt: true,
-  merchantName: true,
-  purchasedAt: true,
-  currency: true,
-  paidByParticipantId: true,
+  ...guestReceiptSelect,
   participants: {
+    ...guestReceiptSelect.participants,
     select: { id: true, displayName: true, picksSubmittedAt: true },
-    orderBy: [{ joinedAt: "asc" }, { id: "asc" }],
   },
-  items: {
-    select: {
-      id: true,
-      lineNumber: true,
-      name: true,
-      quantity: true,
-      totalPrice: true,
-      assignedParticipantId: true,
-      sharedAllocations: {
-        select: { participantId: true },
-        orderBy: [{ participant: { joinedAt: "asc" } }, { participantId: "asc" }],
-      },
-    },
-    orderBy: { lineNumber: "asc" },
-  },
-  bills: { select: { participantId: true, amountOwed: true, paidAt: true } },
 } satisfies Prisma.ReceiptSelect;
-
-const pickersOf = (item: {
-  assignedParticipantId: string | null;
-  sharedAllocations: { participantId: string }[];
-}) =>
-  item.assignedParticipantId !== null
-    ? [item.assignedParticipantId]
-    : item.sharedAllocations.map((allocation) => allocation.participantId);
 
 async function projectPicks(db: Db, receiptId: string, holderId: string) {
   const receipt = await db.receipt.findUniqueOrThrow({
@@ -164,50 +125,10 @@ async function projectPicks(db: Db, receiptId: string, holderId: string) {
     select: pickReceipt,
   });
   const holder = receipt.participants.find((p) => p.id === holderId);
-  const base = {
-    status: receipt.status,
-    revision: receipt.revision,
-    merchantName: receipt.merchantName,
-    purchasedAt: receipt.purchasedAt,
-    currency: receipt.currency,
+  return {
+    ...presentGuestReceipt(receipt),
     participantId: holderId,
     picksSubmittedAt: holder?.picksSubmittedAt ?? null,
-    items: receipt.items.map((item) => ({
-      id: item.id,
-      lineNumber: item.lineNumber,
-      name: item.name,
-      quantity: item.quantity,
-      totalPrice: item.totalPrice,
-      pickedBy: pickersOf(item),
-    })),
-  };
-  if (receipt.status !== "FINALIZED") {
-    return {
-      ...base,
-      pickingOpen: receipt.picksOpenedAt !== null,
-      participants: receipt.participants.map(({ id, displayName }) => ({ id, displayName })),
-    };
-  }
-  // Same amounts and settled rule as the owner's bill list (bills/list.md).
-  const bills = new Map(receipt.bills.map((bill) => [bill.participantId, bill]));
-  const payer = receipt.participants.find(
-    (p) => p.id === receipt.paidByParticipantId,
-  );
-  return {
-    ...base,
-    paidBy: payer?.displayName ?? null,
-    participants: receipt.participants.map(({ id, displayName }) => {
-      const bill = bills.get(id);
-      const owed = bill ? toCents(bill.amountOwed.toString()) : 0n;
-      return {
-        id,
-        displayName,
-        amountOwed: centsToMoney(owed),
-        settled: bill
-          ? isBillSettled(bill, owed, receipt.paidByParticipantId)
-          : true,
-      };
-    }),
   };
 }
 

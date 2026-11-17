@@ -52,6 +52,10 @@ that isn't ready can't be reached, by button or by URL.
 | `/p/[token]` | Guest picks, then the split (no step bar, no account) |
 | `/g/[token]` | Group link: a guest claims their name (no step bar, no account) |
 
+- `/g/` is a public page-path prefix for signed-out guests. Its page is
+  separate UI work; the group API in receipts/guest-picks.md provides the
+  roster, claim and finalized split without requiring that page. A group
+  credential issues a personal link; the existing personal flow owns picking.
 - Every `/receipts/...` route requires a signed-in user; the middleware sends
   signed-out visitors to sign in. A foreign, unknown or deleted receipt
   renders the not-found page, never a permission message.
