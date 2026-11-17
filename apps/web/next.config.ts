@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Next dev logs literal request URLs by default; bearer links must stay out.
+  logging: { incomingRequests: { ignore: [/^\/(?:g|p)\//, /^\/api\/(?:groups|picks)\//] } },
   // PGlite ships WASM; let Node load it directly instead of bundling.
   serverExternalPackages: ["@electric-sql/pglite", "pglite-prisma-adapter"],
   outputFileTracingIncludes: {

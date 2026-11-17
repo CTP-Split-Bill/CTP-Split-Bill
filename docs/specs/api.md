@@ -35,9 +35,14 @@ detailed behavior; this page distinguishes implemented operations from scaffolds
   generic 500. Receipt image storage failures return 503 with code INTERNAL and
   a retry message. Prisma P2002 maps to 409 and P2025 to 404.
 - Health is the documented public exception and retains its probe response.
-- Guest links are the one token-scoped exception (ADR-0015): /api/picks/[token]
+- Guest links are the token-scoped exception (ADR-0015 and ADR-0017):
+  /api/picks/[token], /api/groups/[token] and /api/groups/[token]/claim
   routes derive no user identity; the token hash is the scope
   (receipts/guest-picks.md).
+- Group claims and owner group-link issue/rotation/revocation take no
+  expectedRevision and preserve revision. Claims take the receipt row lock
+  in either draft picking mode; group-link management also works after
+  finalize. Link changes preserve participant picks and done state.
 
 ## Implemented operations
 
@@ -58,6 +63,10 @@ detailed behavior; this page distinguishes implemented operations from scaffolds
 | PUT | /api/receipts/[id]/participants | ReplaceParticipants with expectedRevision and participants: [{id?, displayName?, phone?, email?}]; receipt detail | receipts/participants.md |
 | POST | /api/receipts/[id]/participants/[participantId]/pick-link | Issue or rotate a participant's pick link; `{ url }`, shown once | receipts/guest-picks.md |
 | DELETE | /api/receipts/[id]/participants/[participantId]/pick-link | Revoke a participant's pick link; idempotent | receipts/guest-picks.md |
+| POST | /api/receipts/[id]/group-link | Issue or rotate the owned group token; 200 `{ url }`, shown once | receipts/guest-picks.md |
+| DELETE | /api/receipts/[id]/group-link | Revoke the owned group token; idempotent, empty 204 | receipts/guest-picks.md |
+| GET | /api/groups/[token] | Anonymous claim roster on a draft; holder-independent split once finalized | receipts/guest-picks.md |
+| POST | /api/groups/[token]/claim | `{ participantId }`; 200 personal `{ url }` once; claimed or finalized 409 | receipts/guest-picks.md |
 | POST | /api/receipts/[id]/picking | `{ open }`; open or pause picking without changing the revision; receipt detail | receipts/guest-picks.md |
 | PUT | /api/receipts/[id]/picks | `{ itemIds }`; the organizer row's complete pick set, in either mode; receipt detail | receipts/guest-picks.md |
 | GET | /api/picks/[token] | Token-scoped projection: picking state on a draft, everyone's amounts once finalized | receipts/guest-picks.md |
@@ -78,8 +87,9 @@ the individual bill handler reads params.billsId. Missing IDs never widen a quer
 
 Upload creates an unparsed draft; parsing is an explicit separate request.
 Image download, parsing and participant replacement are implemented.
-Party APIs, guest authentication and public share links are outside this API; guests reach a
-receipt only through a pick link.
+Party APIs, guest accounts and the superseded public-share-link system are
+outside this API. Guests reach a receipt through a personal pick token or
+a group token; only a personal token authorizes guest picking.
 
 Draft, pending review: totals on GET /api/receipts/[id]
 (receipts/totals-check.md). It does not exist yet.

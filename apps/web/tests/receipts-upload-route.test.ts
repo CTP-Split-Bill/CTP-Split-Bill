@@ -82,7 +82,7 @@ describe("receipt photo uploads", () => {
     const body = await response.json();
     expect(body).toEqual({
       id: expect.any(String), ownerId: "upload-owner", title: null, paidByParticipantId: null,
-      organizerParticipantId: expect.any(String), picksOpenedAt: null,
+      organizerParticipantId: expect.any(String), picksOpenedAt: null, hasGroupLink: false,
       status: "DRAFT", parseStatus: "NOT_STARTED", splitMode: "EVEN", revision: 1,
       reviewedAt: null, finalizedAt: null, merchantName: null, address: null,
       purchasedAt: null, currency: "USD", subtotal: null, tax: null, tip: null,
