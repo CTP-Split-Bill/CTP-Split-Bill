@@ -9,6 +9,7 @@ vi.mock("@project/auth", () => authMock);
 const { pageRedirect, safeCallbackPath } = await import("../app/lib/page-access");
 const { signInWithGitHub } = await import("../app/login/actions");
 const { default: LoginPage } = await import("../app/login/page");
+const { default: nextConfig } = await import("../next.config");
 
 const render = async (params: Record<string, string> = {}) =>
   renderToStaticMarkup(await LoginPage({ searchParams: Promise.resolve(params) }));
@@ -16,6 +17,23 @@ const render = async (params: Record<string, string> = {}) =>
 beforeEach(() => authMock.signIn.mockClear());
 
 describe("pageRedirect", () => {
+  it("keeps token-bearing page and API URLs out of Next's request log", () => {
+    const logging = nextConfig.logging;
+    const incoming = logging && logging.incomingRequests;
+    const ignore = typeof incoming === "object" ? incoming.ignore ?? [] : [];
+    for (const path of ["/g/secret", "/p/secret", "/api/groups/secret", "/api/groups/secret/claim", "/api/picks/secret/done"]) {
+      expect(ignore.some((pattern) => pattern.test(path))).toBe(true);
+    }
+    expect(ignore.some((pattern) => pattern.test("/api/receipts/abc"))).toBe(false);
+  });
+
+  it("allows group page paths without making similarly named routes public", () => {
+    expect(pageRedirect("/g/token", "", false)).toBeNull();
+    for (const path of ["/g", "/group", "/groups/token", "/guest", "/receipts/abc"]) {
+      expect(pageRedirect(path, "", false)).toBe(`/login?callbackUrl=${encodeURIComponent(path)}`);
+    }
+  });
+
   it("sends signed-out visitors of protected pages to /login with their destination", () => {
     expect(pageRedirect("/receipts/abc", "?tab=bills", false)).toBe("/login?callbackUrl=%2Freceipts%2Fabc%3Ftab%3Dbills");
   });

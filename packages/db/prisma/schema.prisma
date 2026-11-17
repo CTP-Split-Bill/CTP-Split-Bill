@@ -122,6 +122,8 @@ model Receipt {
 
   // Picking open (ADR-0017): null is Editing, a timestamp is Picking open.
   picksOpenedAt DateTime? @map("picks_opened_at")
+  // Shared roster/claim credential (ADR-0017); raw tokens are never stored.
+  groupTokenHash String? @unique @map("group_token_hash")
   // The organizer's own roster row (ADR-0018); null on receipts created before it.
   organizerParticipantId String?      @map("organizer_participant_id")
   organizerParticipant   Participant? @relation("ReceiptOrganizer", fields: [id, organizerParticipantId], references: [receiptId, id], onDelete: Restrict, onUpdate: NoAction)

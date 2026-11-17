@@ -57,7 +57,7 @@ export type UpdateReceiptInput = z.infer<typeof UpdateReceipt>;
 
 export const receiptDetail = {
   id: true, ownerId: true, title: true, paidByParticipantId: true,
-  organizerParticipantId: true, picksOpenedAt: true,
+  organizerParticipantId: true, picksOpenedAt: true, groupTokenHash: true,
   status: true, parseStatus: true, splitMode: true, revision: true,
   reviewedAt: true, finalizedAt: true, merchantName: true, address: true,
   purchasedAt: true, currency: true, subtotal: true, tax: true, tip: true,
@@ -82,16 +82,17 @@ export const receiptDetail = {
   },
 } satisfies Prisma.ReceiptSelect;
 
-// Every receiptDetail read goes through here: the pick-token hash is reduced to
-// hasPickLink and never leaves the domain (receipts/detail.md).
+// Every receiptDetail read reduces token hashes to booleans; neither hash leaves
+// the domain, including mutation responses (receipts/detail.md).
 type PresentedParticipant<P> = Omit<P, "pickTokenHash"> & { hasPickLink: boolean };
 
-export function presentReceipt<P extends { pickTokenHash: string | null }, R extends { participants: P[] }>(
+export function presentReceipt<P extends { pickTokenHash: string | null }, R extends { participants: P[]; groupTokenHash: string | null }>(
   receipt: R & { participants: P[] },
-): Omit<R, "participants"> & { participants: PresentedParticipant<P>[] } {
-  const { participants, ...rest } = receipt;
+): Omit<R, "participants" | "groupTokenHash"> & { hasGroupLink: boolean; participants: PresentedParticipant<P>[] } {
+  const { participants, groupTokenHash, ...rest } = receipt;
   return {
     ...rest,
+    hasGroupLink: groupTokenHash !== null,
     participants: participants.map(({ pickTokenHash, ...participant }) => ({
       ...participant,
       hasPickLink: pickTokenHash !== null,
