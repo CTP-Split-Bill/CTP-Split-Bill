@@ -2,13 +2,16 @@
 // The one client refresh path for receipt screens (ADR-0018): while enabled,
 // reads GET /api/receipts/[id] every 5 s while the tab is visible and right
 // away when it regains focus, and hands over the detail only when the
-// revision or the picking mode changed (docs/specs/bills/split-screen.md,
+// revision, the picking mode or someone's link or done state changed (docs/specs/bills/split-screen.md,
 // "Refresh"). Push (ADR-0007) can replace this file without touching screens.
 import { useEffect, useRef, useState } from "react";
 
 export const REFRESH_MS = 5000;
 
-type Detail = { revision: number; picksOpenedAt: string | null; status: string };
+// Link issues and group-link claims don't advance the revision (ADR-0017),
+// so who holds a link is part of the state the board compares.
+type Readiness = { id: string; hasPickLink: boolean; picksSubmittedAt: string | null };
+type Detail = { revision: number; picksOpenedAt: string | null; status: string; participants?: Readiness[] };
 
 export type RefreshEnv = {
   read: () => Promise<{ status: number; json: () => Promise<unknown> }>;
@@ -27,7 +30,13 @@ export type RefreshHandlers = {
   onMissing: () => void;
 };
 
-const stateKey = (d: Detail) => `${d.revision}|${d.picksOpenedAt === null ? "editing" : "open"}|${d.status}`;
+const stateKey = (d: Detail) =>
+  [
+    d.revision,
+    d.picksOpenedAt === null ? "editing" : "open",
+    d.status,
+    (d.participants ?? []).map((p) => `${p.id}:${p.hasPickLink ? "link" : "-"}:${p.picksSubmittedAt ? "done" : "-"}`).join(","),
+  ].join("|");
 
 // Starts polling; returns stop. `known` is the state the screen already shows.
 export function startReceiptRefresh(env: RefreshEnv, known: Detail, handlers: RefreshHandlers): () => void {

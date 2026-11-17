@@ -92,6 +92,7 @@ export function PicksBoard({ initial }: { initial: BoardReceipt }) {
     revision: saved.revision,
     picksOpenedAt: saved.pickingOpen ? "open" : null,
     status: saved.finalized ? "FINALIZED" : "DRAFT",
+    participants: saved.people.map((p) => ({ id: p.id, hasPickLink: p.hasPickLink, picksSubmittedAt: p.done ? "done" : null })),
   }, {
     onChange: (detail) => {
       adopt(toBoardReceipt(detail as unknown as Parameters<typeof toBoardReceipt>[0]));

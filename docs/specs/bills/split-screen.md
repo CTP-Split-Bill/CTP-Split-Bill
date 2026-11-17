@@ -24,8 +24,8 @@ saves without a guest's pick undoing the fix (ADR-0017).
   requests, in which order).
 - apps/web/app/lib/use-receipt-refresh.ts: the one client refresh hook
   (ADR-0018): polls `GET /api/receipts/[id]`, reports whether the last read
-  failed, and hands over new detail only when the revision or the picking
-  mode changed.
+  failed, and hands over new detail only when the revision, the picking
+  mode, or someone's link or done state changed.
 - packages/domain/src/allocate.ts: pure, no database or logging import;
   exported as `@project/domain/allocate`. Builds the allocator input from
   receipt detail and runs the existing split arithmetic, so the board and
@@ -179,9 +179,11 @@ saves without a guest's pick undoing the fix (ADR-0017).
 - While picking is open and the tab is visible, `use-receipt-refresh` reads
   `GET /api/receipts/[id]` every 5 seconds, and once right away when the tab
   regains focus or becomes visible. A hidden tab doesn't poll.
-- It replaces the board's state only when the revision or the picking mode
-  differs from what it holds (opening and pausing don't change the
-  revision); otherwise nothing on the board changes. A changed revision
+- It replaces the board's state only when the revision, the picking mode,
+  or any participant's hasPickLink or done state differs from what it holds
+  (opening and pausing, issuing or revoking a link, and a guest claiming
+  their name from the group link don't change the revision); otherwise
+  nothing on the board changes. A changed revision
   also refreshes the layout, so the step bar's Next updates when the last
   item is claimed.
 - At most one read is in flight; a tick while one is pending is skipped.
@@ -257,6 +259,7 @@ created through the app, where the organizer is Demo User.
 | Salmon roll unclaimed, the rest as above | Bar reads "Your items so far $5.00"; Sam $9.00 when expanded; "1 item unclaimed · $16.00"; no tax or tip shown |
 | Tab hidden for a minute | No reads while hidden; one read on return |
 | Two reads return the same revision | Nothing on the board changes |
+| Sam claims his name from the group link | Within 5 s, Sam's row reads Still picking instead of No link |
 | Pause picking to edit, select You, tap Salmon roll, Save | PUT assignments with the read's revision; 200, no 409 |
 | Editing, select Sam, tap Salmon roll (receipt ITEMIZED, You had it) | Save sends PATCH SHARED_ITEMS, then PUT shared-allocations, then PUT assignments |
 | Editing, choose Even, Save | One PATCH to EVEN; assignments cleared; everyone's share shown |
@@ -281,7 +284,7 @@ created through the app, where the organizer is Demo User.
   routes until the plan is empty, and checks the board's amounts equal
   previewReceipt's, including EVEN. use-receipt-refresh.test.ts covers the
   5 s interval, no reads while hidden, a read on focus, one read in flight
-  at most, handing over state only on a revision or mode change, stopping,
+  at most, handing over state only on a revision, mode, link or done change, stopping,
   and the 401, 404 and failure paths. allocate.test.ts covers owed amounts,
   items so far, EVEN, a subtotal mismatch, and that rows plus unclaimed
   always equal the items.

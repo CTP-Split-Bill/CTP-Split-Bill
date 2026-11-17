@@ -40,6 +40,22 @@ function handlers() {
 const settle = () => new Promise((r) => setTimeout(r, 0));
 
 describe("startReceiptRefresh", () => {
+  it("hands over detail when a guest claims a link, though the revision is the same", async () => {
+    const sam = (hasPickLink: boolean) => ({ ...detail(4), participants: [{ id: "sam", hasPickLink, picksSubmittedAt: null }] });
+    const f = fakeEnv([{ status: 200, body: sam(false) }, { status: 200, body: sam(true) }]);
+    const h = handlers();
+    startReceiptRefresh(f.env, sam(false), h);
+
+    f.tick();
+    await settle();
+    expect(h.onChange).not.toHaveBeenCalled();
+
+    f.tick();
+    await settle();
+    expect(h.onChange).toHaveBeenCalledTimes(1);
+    expect(h.onChange.mock.calls[0][0]).toMatchObject({ revision: 4, participants: [{ hasPickLink: true }] });
+  });
+
   it("reads every 5 s and hands over detail only when the revision changes", async () => {
     const f = fakeEnv([{ status: 200, body: detail(1) }, { status: 200, body: detail(2) }]);
     const h = handlers();
