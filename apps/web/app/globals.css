@@ -18,6 +18,16 @@
   /* Waiting on someone else: guests picking, people who still owe. */
   --color-warning: #b45309;
 
+  /* Avatar fills, by roster position; the same in both themes, with
+     --color-person-ink for the initial on any of them. */
+  --color-person-1: #7dd3c0;
+  --color-person-2: #fca58a;
+  --color-person-3: #c4b5fd;
+  --color-person-4: #f5d06b;
+  --color-person-5: #93c5fd;
+  --color-person-6: #f9a8d4;
+  --color-person-ink: #1c1c1a;
+
   --radius-card: 0.75rem;
 
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
