@@ -15,6 +15,8 @@
   --color-brand: #0f766e;
   --color-brand-ink: #ffffff;
   --color-danger: #b42318;
+  /* Waiting on someone else: guests picking, people who still owe. */
+  --color-warning: #b45309;
 
   --radius-card: 0.75rem;
 
@@ -31,6 +33,7 @@
     --color-brand: #2dd4bf;
     --color-brand-ink: #042f2e;
     --color-danger: #f97066;
+    --color-warning: #fbbf24;
   }
 }
 
