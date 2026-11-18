@@ -52,6 +52,10 @@ that isn't ready can't be reached, by button or by URL.
 | `/p/[token]` | Guest picks, then the split (no step bar, no account) |
 | `/g/[token]` | Group link: a guest claims their name (no step bar, no account) |
 
+- `/g/` is a public page-path prefix for signed-out guests. Its page is
+  separate UI work; the group API in receipts/guest-picks.md provides the
+  roster, claim and finalized split without requiring that page. A group
+  credential issues a personal link; the existing personal flow owns picking.
 - Every `/receipts/...` route requires a signed-in user; the middleware sends
   signed-out visitors to sign in. A foreign, unknown or deleted receipt
   renders the not-found page, never a permission message.
@@ -118,6 +122,10 @@ step's state from receipt detail; no progress is stored.
 - The current step has `aria-current="step"`.
 - A step screen that saves something the step rules read refreshes the
   layout, so the bar updates without a reload.
+- Moving to another step re-renders the layout on the server, so the bar's
+  states are current on arrival (for example, Items shows done after
+  Confirm items). Next.js otherwise keeps a layout across navigations
+  between its pages.
 - The bar meets web.md's mobile standard: 44px targets, no horizontal scroll
   at 375px, and every control reachable by keyboard.
 
@@ -171,8 +179,9 @@ step's state from receipt detail; no progress is stored.
 ## Out of scope
 
 - What each step's screen contains; each screen has its own spec
-  (receipts/participants-screen.md, receipts/guest-picks.md, and the upload,
-  edit, picks and finalize screen specs as they are written).
+  (receipts/participants-screen.md, receipts/guest-picks.md,
+  receipts/edit-screen.md, and the upload, picks and finalize screen specs
+  as they are written).
 - The picking/editing switch's API and data: receipts/guest-picks.md and
   bills/allocations.md, as updated for ADR-0017. The organizer row:
   receipts/participants.md, as updated for ADR-0018.

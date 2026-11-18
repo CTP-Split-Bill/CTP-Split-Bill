@@ -39,7 +39,8 @@ beforeEach(async () => {
     INSERT INTO payments (id, bill_id, amount, paid_at) VALUES
       ('payment', 'bill-sam', 6.45, '2020-01-05');
   `);
-});
+// WASM startup competes with the route suites' in-memory engines in the full run.
+}, 30_000);
 afterEach(async () => { await db.close(); });
 
 async function rejectsUpgrade(message: string | RegExp) {

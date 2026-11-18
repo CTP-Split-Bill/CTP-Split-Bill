@@ -44,12 +44,15 @@ Every feature template section is required. See ../../CONTRIBUTING.md.
 | [receipt upload](receipts/upload.md) | Validated photo upload and owned draft creation with failed-write cleanup |
 | [receipt detail](receipts/detail.md) | Owner-only receipt, participant and item projection |
 | [receipt corrections](receipts/edit.md) | Versioned metadata/money edits and review confirmation |
+| [receipt deletion and restoration](receipts/delete.md) | Owner-scoped visibility changes with preserved content, bills and tokens |
 | [receipt items](receipts/items.md) | Atomic corrected-item replacement and assignment cleanup |
 | [assignments](bills/allocations.md) | One-person item assignments and separate equal shared allocations |
 | [preview](bills/preview.md) | Read-only allocation breakdown for a stored draft revision |
 | [finalization](bills/split-allocation.md) | Exact-cent server calculation and immutable bill snapshots |
 | [bill reads](bills/list.md) | Owner-only bill breakdowns and outstanding amounts |
 | [bills list screen](bills/list-screen.md) | Home screen summaries, status badges and formatted receipt cards |
+| [upload screen](receipts/upload-screen.md) | Upload a receipt photo, watch it being read, then check the items or enter them by hand |
+| [items screen](receipts/edit-screen.md) | Correct the restaurant, items and totals, see whether they add up, and confirm them |
 
 ## Draft features (under review)
 

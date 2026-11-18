@@ -22,6 +22,6 @@ export function pageRedirect(pathname: string, search: string, signedIn: boolean
   if (pathname === LOGIN_PATH) {
     return signedIn ? safeCallbackPath(new URLSearchParams(search).get("callbackUrl")) : null;
   }
-  if (PUBLIC_PAGES.has(pathname) || signedIn) return null;
+  if (PUBLIC_PAGES.has(pathname) || pathname.startsWith("/g/") || signedIn) return null;
   return loginPath(`${pathname}${search}`);
 }

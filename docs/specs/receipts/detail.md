@@ -28,6 +28,9 @@ and inspect a finalized receipt without exposing internal parser/blob data.
   revision, review/finalization timestamps, merchant/address/purchase date,
   currency, nullable amounts, creation/update times, participants, items and
   the derived `totals` check (receipts/totals-check.md).
+- Receipt detail includes `hasGroupLink`, derived from whether the receipt
+  holds a group token hash. `groupTokenHash` is never returned, including
+  mutation responses that reuse receipt detail (receipts/guest-picks.md).
 - Participants include id, displayName, phone, email, joinedAt, hasPickLink
   and picksSubmittedAt (null until the guest presses done), ordered by
   joinedAt then id. This contact projection is organizer-only. hasPickLink is

@@ -152,11 +152,12 @@ describe("pick-link owner routes", () => {
     expect((await read(second)).status).toBe(200);
   });
 
-  it("revoking clears the hash and done state, kills the link, and is idempotent", async () => {
+  it("revoking clears only the hash, preserves done state, kills the link, and is idempotent", async () => {
     const token = await tokenFor(d.receipt.id, d.sam.id);
     expect((await submit(token)).status).toBe(200);
+    const submittedAt = (await participantRow(d.sam.id)).picksSubmittedAt;
     expect((await revoke(d.receipt.id, d.sam.id)).status).toBe(204);
-    expect(await participantRow(d.sam.id)).toMatchObject({ pickTokenHash: null, picksSubmittedAt: null });
+    expect(await participantRow(d.sam.id)).toMatchObject({ pickTokenHash: null, picksSubmittedAt: submittedAt });
     expect((await read(token)).status).toBe(404);
     expect((await revoke(d.receipt.id, d.sam.id)).status).toBe(204);
   });

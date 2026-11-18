@@ -1,5 +1,5 @@
-// Receipt corrections and reads. Ownership, revisions and review state are
-// checked in the same transaction as each draft mutation.
+// Receipt reads, corrections and soft deletion. Draft content mutations check
+// ownership/revision/review transactionally; deletion preserves content/revision.
 import { z } from "zod";
 import { prisma, type Prisma } from "@project/db";
 import { ApiError } from "./errors";
@@ -58,7 +58,7 @@ export type UpdateReceiptInput = z.infer<typeof UpdateReceipt>;
 
 export const receiptDetail = {
   id: true, ownerId: true, title: true, paidByParticipantId: true,
-  organizerParticipantId: true, picksOpenedAt: true,
+  organizerParticipantId: true, picksOpenedAt: true, groupTokenHash: true,
   status: true, parseStatus: true, splitMode: true, revision: true,
   reviewedAt: true, finalizedAt: true, merchantName: true, address: true,
   purchasedAt: true, currency: true, subtotal: true, tax: true, tip: true,
@@ -85,21 +85,24 @@ export const receiptDetail = {
 
 type StoredMoney = { toString(): string } | null;
 
-// Every receiptDetail read goes through here: the pick-token hash is reduced to
-// hasPickLink and never leaves the domain (receipts/detail.md), and the
-// derived totals check is added (receipts/totals-check.md).
+// Every receiptDetail read reduces token hashes to booleans; neither hash leaves
+// the domain, including mutation responses (receipts/detail.md). The derived
+// totals check is added (receipts/totals-check.md).
 type PresentedParticipant<P> = Omit<P, "pickTokenHash"> & { hasPickLink: boolean };
 type TotalsSource = Parameters<typeof receiptTotals>[0];
 
 export function presentReceipt<
   P extends { pickTokenHash: string | null },
-  R extends { participants: P[] } & TotalsSource,
+  R extends { participants: P[]; groupTokenHash: string | null } & TotalsSource,
 >(
   receipt: R & { participants: P[] },
-): Omit<R, "participants"> & { participants: PresentedParticipant<P>[]; totals: ReceiptTotals } {
-  const { participants, ...rest } = receipt;
+): Omit<R, "participants" | "groupTokenHash"> & {
+  hasGroupLink: boolean; participants: PresentedParticipant<P>[]; totals: ReceiptTotals;
+} {
+  const { participants, groupTokenHash, ...rest } = receipt;
   return {
     ...rest,
+    hasGroupLink: groupTokenHash !== null,
     participants: participants.map(({ pickTokenHash, ...participant }) => ({
       ...participant,
       hasPickLink: pickTokenHash !== null,
@@ -291,4 +294,18 @@ export async function createReceipt(
 export function organizerName(name: string | null): string {
   const trimmed = name?.trim().slice(0, 50).trim();
   return trimmed ? trimmed : "You";
+}
+
+export async function softDeleteReceipt(userId: string, receiptId:string){
+  await requireReceiptUser(userId);
+  const scope = receiptScope(userId, receiptId);
+
+  const result = await prisma.receipt.updateMany({
+    where: scope,
+    data: {deletedAt: new Date() },
+  });
+
+  if (result.count == 0){
+    throw new ApiError("NOT_FOUND", "Receipt not found", 404);
+  }
 }

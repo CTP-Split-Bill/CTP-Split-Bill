@@ -55,11 +55,16 @@ Every route handler and Server Action, in order:
   / 409 conflict. Prisma mapped: P2002→409, P2025→404.
 - **Foreign resources return 404, not 403** — existence is not confirmed to
   non-owners.
-- One exception to step 1: guest link routes (`/api/picks/[token]`) derive no
-  user identity; the token hash is the scope. See
-  [ADR-0015](../adr/0015-guest-pick-links.md) and
+- One exception to step 1: guest link routes (`/api/picks/[token]` and its
+  done route, `/api/groups/[token]` and `/api/groups/[token]/claim`) derive no
+  user identity; the token hash is the scope. Group claims issue a personal
+  credential and grant no permission to change other participants' picks. See
+  [ADR-0015](../adr/0015-guest-pick-links.md),
+  [ADR-0017](../adr/0017-group-pick-link.md) and
   [guest picks](receipts/guest-picks.md).
 - Raw errors and stack traces never reach a client.
+- Token-bearing `/g/`, `/p/`, `/api/groups/` and `/api/picks/` request paths
+  are excluded from Next.js incoming-request logs, including local development.
 
 ## Dev server and bundler
 
