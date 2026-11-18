@@ -244,12 +244,12 @@ describe("receipt DELETE", () => {
 
 describe("receipt restore POST", () => {
   it.each([
-    { status: "DRAFT", parseStatus: "NOT_STARTED" },
-    { status: "DRAFT", parseStatus: "PARSING" },
-    { status: "DRAFT", parseStatus: "FAILED" },
-    { status: "DRAFT", parseStatus: "SUCCEEDED" },
-    { status: "FINALIZED", parseStatus: "SUCCEEDED" },
-  ] as const)("restores $status/$parseStatus with the existing summary and unchanged content", async (state) => {
+    { state: { status: "DRAFT", parseStatus: "NOT_STARTED" }, nextStep: "scan", picks: { open: true, done: 1, total: 2 } },
+    { state: { status: "DRAFT", parseStatus: "PARSING" }, nextStep: "scan", picks: { open: true, done: 1, total: 2 } },
+    { state: { status: "DRAFT", parseStatus: "FAILED" }, nextStep: "finalize", picks: { open: true, done: 1, total: 2 } },
+    { state: { status: "DRAFT", parseStatus: "SUCCEEDED" }, nextStep: "finalize", picks: { open: true, done: 1, total: 2 } },
+    { state: { status: "FINALIZED", parseStatus: "SUCCEEDED" }, nextStep: null, picks: null },
+  ] as const)("restores $state.status/$state.parseStatus with the existing summary and unchanged content", async ({ state, nextStep, picks }) => {
     await prisma.receipt.update({ where: { id: receiptId }, data: {
       ...state, finalizedAt: state.status === "FINALIZED" ? new Date(3) : null,
     } });
@@ -261,7 +261,7 @@ describe("receipt restore POST", () => {
     expect(await response.json()).toEqual({
       id: receiptId, status: state.status, merchantName: "Bistro", title: "Dinner",
       total: "26.00", createdAt: before.createdAt.toISOString(), payerName: "Alex",
-      participantCount: 2, settled: null,
+      participantCount: 2, settled: null, unpaidCount: null, outstanding: null, nextStep, picks,
     });
     expect(cache.revalidatePath).toHaveBeenCalledExactlyOnceWith("/");
     const { updatedAt, ...after } = await snapshot();
@@ -271,12 +271,12 @@ describe("receipt restore POST", () => {
   });
 
   it.each([
-    { status: "FINALIZED", bill: "unpaid", settled: false },
-    { status: "FINALIZED", bill: "paid", settled: true },
-    { status: "FINALIZED", bill: "payer", settled: true },
-    { status: "FINALIZED", bill: "zero", settled: true },
-    { status: "DRAFT", bill: "unpaid", settled: null },
-  ] as const)("preserves a $status/$bill bill and returns settled=$settled", async ({ status, bill, settled }) => {
+    { status: "FINALIZED", bill: "unpaid", settled: false, unpaidCount: 1 },
+    { status: "FINALIZED", bill: "paid", settled: true, unpaidCount: 0 },
+    { status: "FINALIZED", bill: "payer", settled: true, unpaidCount: 0 },
+    { status: "FINALIZED", bill: "zero", settled: true, unpaidCount: 0 },
+    { status: "DRAFT", bill: "unpaid", settled: null, unpaidCount: null },
+  ] as const)("preserves a $status/$bill bill and returns settled=$settled", async ({ status, bill, settled, unpaidCount }) => {
     const receipt = await snapshot();
     const guest = receipt.participants.find((p) => p.id !== receipt.paidByParticipantId)!;
     await prisma.receipt.update({ where: { id: receiptId }, data: {
@@ -293,6 +293,7 @@ describe("receipt restore POST", () => {
     expect(response.status).toBe(200);
     const summary = await response.json();
     expect(summary.settled).toBe(settled);
+    expect(summary.unpaidCount).toBe(unpaidCount);
     const summaries = await (await summaryRoute.GET()).json();
     expect(summaries.find((r: { id: string }) => r.id === receiptId)).toEqual(summary);
     const { updatedAt: _afterUpdate, ...after } = await snapshot();
@@ -311,7 +312,8 @@ describe("receipt restore POST", () => {
     expect(await response.json()).toEqual({
       id: receiptId, status: "DRAFT", merchantName: null, title: null, total: null,
       createdAt: before.createdAt.toISOString(), payerName: null,
-      participantCount: 2, settled: null,
+      participantCount: 2, settled: null, unpaidCount: null, outstanding: null,
+      nextStep: "finalize", picks: { open: true, done: 1, total: 2 },
     });
   });
 
