@@ -20,9 +20,9 @@ query plan or a currency decision into whatever screen renders it next.
   `CardContent`, `CardFooter`), `button.tsx` (`Button`, `buttonVariants`),
   `dropdown-menu.tsx` (`DropdownMenu` and its parts), `skeleton.tsx`
   (`Skeleton`), `alert.tsx` (`Alert`, `AlertTitle`, `AlertDescription`),
-  `sonner.tsx` (`Toaster`), `badge.tsx` (`Badge`, `badgeVariants`) and
+  `sonner.tsx` (`Toaster`), `badge.tsx` (`Badge`, `badgeVariants`),
   `table.tsx` (`Table`, `TableHeader`, `TableBody`, `TableRow`, `TableHead`,
-  `TableCell`).
+  `TableCell`), and `toggle-group.tsx` (`ToggleGroup`, `ToggleGroupItem`).
 - `apps/web/app/components/` (outside `ui/`) — **layer 2**, domain
   components: `BillCard.tsx`, `UserMenu.tsx`, and the async-state blocks
   `LoadingState.tsx`, `EmptyState.tsx` and `ErrorState.tsx`.
@@ -110,6 +110,7 @@ and nowhere else.
 | `--color-ink-muted` | `text-ink-muted` | labels and secondary text |
 | `--color-brand` / `--color-brand-ink` | `text-brand`, `bg-brand` / `text-brand-ink` | links and primary actions, and text on them |
 | `--color-danger` | `text-danger` | error text |
+| `--color-person-1` … `--color-person-6` / `--color-person-ink` | `bg-person-1` … `bg-person-6` / `text-person-ink` | avatar fills for people on a receipt, by roster position, and the initial on them; the same in both themes |
 | `--radius-card` | `rounded-card` | card corner radius |
 | `--font-sans` | `font-sans` | the system UI font stack |
 
