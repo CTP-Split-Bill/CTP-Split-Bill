@@ -76,8 +76,8 @@ export class GuestPickSession {
 
   refresh(): Promise<void> {
     if (!this.active || this.state.invalid || this.confirmed.finalized) return Promise.resolve();
-    // Coalesce focus/visibility events, including events arriving during GET.
-    if (this.state.busy && this.reading) return this.running ?? Promise.resolve();
+    // Keep one trailing read when focus/visibility returns during a GET;
+    // that request may already have captured an out-of-date picking mode.
     this.wantsRead = true;
     this.update({ blocked: true });
     return this.start();
@@ -86,8 +86,6 @@ export class GuestPickSession {
   // Effect cleanup prevents queued work after unmount. An already-sent request
   // may still commit; reopening always starts from the server projection.
   setActive(active: boolean) { this.active = active; }
-
-  private reading = false;
 
   private start(): Promise<void> {
     if (this.running) return this.running;
@@ -129,7 +127,6 @@ export class GuestPickSession {
       const selected = [...this.state.selected];
       if (method === "GET") this.wantsRead = false;
       if (method === "POST") this.wantsDone = false;
-      this.reading = method === "GET";
       try {
         const reply = await this.env.request(method, method === "PUT" ? selected : undefined);
         if (!this.active) break;
@@ -150,15 +147,13 @@ export class GuestPickSession {
           this.update({ invalid: true, blocked: true, error: null });
         } else {
           this.fail(method === "GET" ? READ_FAILED : method === "POST" ? DONE_FAILED : SAVE_FAILED, method !== "POST");
-          this.wantsRead = false;
+          if (method !== "GET") this.wantsRead = false;
         }
       } catch {
         // Even a rejected connection may have committed. Require a successful
         // GET before another write, including a retry of an uncertain done.
         this.fail(method === "GET" ? READ_FAILED : method === "POST" ? DONE_FAILED : SAVE_FAILED, true);
-        this.wantsRead = false;
-      } finally {
-        this.reading = false;
+        if (method !== "GET") this.wantsRead = false;
       }
     }
   }

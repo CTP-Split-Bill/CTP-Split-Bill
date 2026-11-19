@@ -167,7 +167,7 @@ describe("guest pick request queue", () => {
     expect(h.state()).toMatchObject({ blocked: false, error: null });
   });
 
-  it("serializes a focus read behind pending writes and coalesces duplicate reads", async () => {
+  it("serializes a focus read behind pending writes and coalesces trailing reads", async () => {
     const h = harness();
     const running = h.session.toggle("tea");
     void h.session.refresh();
@@ -179,14 +179,52 @@ describe("guest pick request queue", () => {
     void h.session.toggle("rice");
     expect(h.state().selected).toEqual(["rice", "tea"]);
     void h.session.refresh();
+    void h.session.refresh();
     h.calls[1].reply(200, withGuestPicks(["rice", "tea"]));
+    await settle();
+    expect(h.calls).toHaveLength(3);
+    expect(h.calls[2].method).toBe("GET");
+    h.calls[2].reply(200, withGuestPicks(["rice", "tea"]));
     await running;
-    expect(h.calls).toHaveLength(2);
+    expect(h.calls).toHaveLength(3);
+  });
+
+  it("reads the reopened picking mode when a visible return arrives during a stale Editing GET", async () => {
+    const editingSnapshot = guestProjection({ pickingOpen: false });
+    const h = harness(editingSnapshot);
+    const target = new EventTarget();
+    const doc = Object.assign(new EventTarget(), { visibilityState: "visible" });
+    const stop = listenForGuestReturn(target, doc, () => { void h.session.refresh(); });
+    try {
+      target.dispatchEvent(new Event("focus"));
+      expect(h.calls).toHaveLength(1);
+      const reopenedSnapshot = guestProjection({ pickingOpen: true });
+      // The organizer opens picking after the first GET captured Editing.
+      // Returning before it completes must schedule a newer snapshot.
+      doc.visibilityState = "hidden";
+      doc.dispatchEvent(new Event("visibilitychange"));
+      doc.visibilityState = "visible";
+      doc.dispatchEvent(new Event("visibilitychange"));
+      target.dispatchEvent(new Event("focus"));
+      expect(h.calls).toHaveLength(1); // No concurrent GETs.
+      h.calls[0].reply(200, editingSnapshot);
+      await settle();
+      expect(h.state().receipt.pickingOpen).toBe(false);
+      expect(h.state().blocked).toBe(true);
+      expect(h.calls).toHaveLength(2);
+      expect(h.calls[1].method).toBe("GET");
+      h.calls[1].reply(200, reopenedSnapshot);
+      await settle();
+      expect(h.state().receipt.pickingOpen).toBe(true);
+      expect(h.state()).toMatchObject({ busy: false, blocked: false, selected: ["rice"] });
+      expect(h.calls).toHaveLength(2); // Multiple return events coalesce.
+    } finally { stop(); }
   });
 
   it("hands finalization back to the server and starts no more writes", async () => {
     const h = harness();
     const refresh = h.session.refresh();
+    void h.session.refresh(); // Finalization discards the queued trailing GET.
     h.calls[0].reply(200, finalizedProjection());
     await refresh;
     expect(h.onFinalized).toHaveBeenCalledTimes(1);
@@ -194,6 +232,25 @@ describe("guest pick request queue", () => {
     await h.session.toggle("tea");
     await h.session.done();
     expect(h.calls).toHaveLength(1);
+  });
+
+  it.each(["server", "network"])("keeps a trailing return refresh after the current GET's %s failure", async (failure) => {
+    const h = harness(guestProjection({ pickingOpen: false }));
+    const refresh = h.session.refresh();
+    void h.session.refresh();
+    void h.session.refresh();
+    expect(h.calls).toHaveLength(1);
+    if (failure === "server") h.calls[0].reply(500);
+    else h.calls[0].reject();
+    await settle();
+    expect(h.calls).toHaveLength(2);
+    expect(h.calls[1].method).toBe("GET");
+    expect(h.state().blocked).toBe(true);
+    h.calls[1].reply(200, guestProjection());
+    await refresh;
+    expect(h.state()).toMatchObject({ busy: false, blocked: false, error: null });
+    expect(h.state().receipt.pickingOpen).toBe(true);
+    expect(h.calls).toHaveLength(2);
   });
 
   it("refreshes a conflicted done into the finalized server summary", async () => {

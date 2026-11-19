@@ -265,7 +265,11 @@ what to pay without an account or a second link.
 - While editing, rows are read-only and the page says "The organizer is
   making changes. Check back in a minute." with **Check again**. A button
   press or a visible window regaining focus refreshes GET, with no polling.
-  Refreshes and writes are serialized. A 409 refreshes the projection before
+  Refreshes and writes are serialized. A visible return during an outstanding
+  GET records one trailing read, even if the current read fails; multiple
+  returns during that read coalesce. Writes stay disabled until the trailing
+  read completes so an earlier Editing snapshot cannot hide reopened picking.
+  A 409 refreshes the projection before
   any further write; a write 404 also refreshes because an item may have been
   removed while the personal link remains valid. Only a GET 404 invalidates
   the link. Failed refreshes leave writes disabled until a successful retry.
@@ -320,7 +324,8 @@ what to pay without an account or a second link.
   picks, editing/submitted states, and every finalized participant's amount,
   settlement and payer with no picker controls.
 - `guest-pick-session.test.ts` exercises full-set writes, rapid taps, save
-  rollback, queued done, done failure, focus refresh without polling, mode
+  rollback, queued done, done failure, focus refresh without polling, a
+  trailing read when picking reopens during an outstanding GET, mode
   conflicts, removed items, revoked links and draft-to-finalized handoff.
 - pnpm test (group-links-route.test.ts) covers owner authentication and scope,
   issue/rotate/idempotent revoke in both draft modes and after finalize,
