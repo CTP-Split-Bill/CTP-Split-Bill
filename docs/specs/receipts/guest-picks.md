@@ -250,7 +250,10 @@ what to pay without an account or a second link.
   to itself. Unknown links show "This link isn't valid" with no receipt data;
   other failures show a generic retry card, never the underlying error.
 - Draft items are ordered by line number, with their name, quantity, price
-  in the receipt currency and other pickers' names. Each labeled checkbox row
+  in the receipt currency and who else picked it, as the same colored initial
+  circles the organizer's picks board uses (same color per person, by roster
+  position; up to three, then "+N"). Screen readers get the names in the row's
+  description instead of the circles. Each labeled checkbox row
   is at least 44px tall and toggles across its full width. The token holder,
   never the signed-in account, determines the checked items.
 - Changes show immediately. One PUT is in flight at a time; later taps are

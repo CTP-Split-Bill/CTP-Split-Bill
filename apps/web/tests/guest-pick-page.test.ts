@@ -51,6 +51,7 @@ describe("guest page", () => {
     expect(html).toContain('aria-describedby="pick-detail-rice"');
     expect(html).toContain("min-h-14 w-full");
     expect(html).toContain("Also picked by Maya");
+    expect(html).toMatch(/<span aria-hidden="true"[^>]*><span title="Maya" class="[^"]*bg-person-\d[^"]*">M<\/span>/);
     expect(html).toContain("Qty 2 · $12.50");
     expect(html).toContain("I&#x27;m done");
     expect(html).not.toContain("/login");

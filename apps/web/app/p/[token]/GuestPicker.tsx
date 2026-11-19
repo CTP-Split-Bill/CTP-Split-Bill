@@ -8,6 +8,7 @@ import { EmptyState } from "../../components/EmptyState";
 import { ErrorState } from "../../components/ErrorState";
 import { LoadingState } from "../../components/LoadingState";
 import { installLeaveGuard } from "../../receipts/[id]/participants/leave-guard";
+import { PERSON_COLORS, initialOf } from "../../receipts/[id]/picks/picks-form";
 import { GuestPickSession } from "./guest-pick-session";
 import { listenForGuestReturn } from "./guest-focus";
 import { INVALID_LINK, type GuestView } from "./guest-view";
@@ -41,6 +42,8 @@ export function GuestPicker({ token, initial }: { token: string; initial: GuestV
   if (receipt.finalized) return <LoadingState label="Loading the split" rows={3} />;
   const readOnly = !receipt.pickingOpen || blocked || submitting;
   const names = new Map(receipt.people.map((person) => [person.id, person.name]));
+  // Same fills as the organizer's picks board: by roster position.
+  const colors = new Map(receipt.people.map((person, index) => [person.id, (index % PERSON_COLORS) + 1]));
 
   return (
     <section aria-labelledby="guest-picks-heading" className="space-y-6">
@@ -65,7 +68,7 @@ export function GuestPicker({ token, initial }: { token: string; initial: GuestV
       ) : (
         <ul className="space-y-3" aria-label="Receipt items">
           {receipt.items.map((item) => {
-            const others = item.pickedBy.filter((id) => id !== receipt.participantId).map((id) => names.get(id)).filter(Boolean);
+            const others = item.pickedBy.filter((id) => id !== receipt.participantId && names.has(id));
             const checked = selected.includes(item.id);
             return (
               <li key={item.id}>
@@ -77,9 +80,10 @@ export function GuestPicker({ token, initial }: { token: string; initial: GuestV
                     <span id={`pick-name-${item.id}`} className="block font-medium break-words">{item.name}</span>
                     <span id={`pick-detail-${item.id}`} className="block text-sm text-ink-muted break-words">
                       {item.quantity !== null && `Qty ${item.quantity} · `}{item.price}
-                      {others.length > 0 && <span className="block">Also picked by {others.join(", ")}</span>}
+                      {others.length > 0 && <span className="sr-only">. Also picked by {others.map((id) => names.get(id)).join(", ")}</span>}
                     </span>
                   </span>
+                  {others.length > 0 && <PickedBy ids={others} names={names} colors={colors} />}
                 </label>
               </li>
             );
@@ -99,5 +103,29 @@ export function GuestPicker({ token, initial }: { token: string; initial: GuestV
           onClick={() => void session.refresh()}>Check again</Button>}
       </div>
     </section>
+  );
+}
+
+const FILLS = ["bg-person-1", "bg-person-2", "bg-person-3", "bg-person-4", "bg-person-5", "bg-person-6"];
+const SHOWN = 3;
+
+// Who else picked an item, as the organizer's picks board shows it. The names
+// are read from the row's description, so the circles are decorative here.
+function PickedBy({ ids, names, colors }: { ids: string[]; names: Map<string, string>; colors: Map<string, number> }) {
+  const extra = ids.length - SHOWN;
+  return (
+    <span aria-hidden="true" className="flex shrink-0 -space-x-1.5">
+      {ids.slice(0, extra > 0 ? SHOWN - 1 : SHOWN).map((id) => (
+        <span key={id} title={names.get(id)}
+          className={`flex size-7 items-center justify-center rounded-full text-xs font-semibold text-person-ink ring-2 ring-surface ${FILLS[(colors.get(id)! - 1) % FILLS.length]}`}>
+          {initialOf(names.get(id)!)}
+        </span>
+      ))}
+      {extra > 0 && (
+        <span className="flex size-7 items-center justify-center rounded-full bg-line text-xs font-semibold text-ink ring-2 ring-surface">
+          +{extra + 1}
+        </span>
+      )}
+    </span>
   );
 }
