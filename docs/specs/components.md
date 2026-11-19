@@ -22,7 +22,8 @@ query plan or a currency decision into whatever screen renders it next.
   (`Skeleton`), `alert.tsx` (`Alert`, `AlertTitle`, `AlertDescription`),
   `sonner.tsx` (`Toaster`), `badge.tsx` (`Badge`, `badgeVariants`),
   `table.tsx` (`Table`, `TableHeader`, `TableBody`, `TableRow`, `TableHead`,
-  `TableCell`), and `toggle-group.tsx` (`ToggleGroup`, `ToggleGroupItem`).
+  `TableCell`), `checkbox.tsx` (`Checkbox`), and `toggle-group.tsx`
+  (`ToggleGroup`, `ToggleGroupItem`).
 - `apps/web/app/components/` (outside `ui/`) — **layer 2**, domain
   components: `BillRow.tsx`, `UserMenu.tsx`, and the async-state blocks
   `LoadingState.tsx`, `EmptyState.tsx` and `ErrorState.tsx`.
@@ -167,6 +168,10 @@ header, `<main>` or toast host.
   375px viewport with no horizontal scroll.
 - **The account slot** is its own Suspense boundary, so a page never waits
   on it; while it loads it shows a `Skeleton` the size of the menu trigger.
+  - Guest `/p/` and `/g/` pages omit the slot, even with a session, as
+    required by receipts/flow.md. Middleware replaces the internal guest-page
+    request header on every page request; the shell never trusts a browser's
+    supplied value. No session/profile query runs for this slot on guest pages.
   - No session: the slot is empty and the header shows only the app name.
   - A session: the slot reads the profile in-process with `currentUserId()`
     and `getCurrentUser()`, the same query as

@@ -3,6 +3,11 @@
 
 export const LOGIN_PATH = "/login";
 const PUBLIC_PAGES = new Set(["/"]);
+export const GUEST_PAGE_HEADER = "x-split-bill-guest-page";
+
+export function isGuestPage(pathname: string): boolean {
+  return pathname.startsWith("/p/") || pathname.startsWith("/g/");
+}
 
 // Only same-origin paths survive; anything else (absolute or protocol-relative
 // URLs, the login page itself) falls back to the landing page.
@@ -22,6 +27,6 @@ export function pageRedirect(pathname: string, search: string, signedIn: boolean
   if (pathname === LOGIN_PATH) {
     return signedIn ? safeCallbackPath(new URLSearchParams(search).get("callbackUrl")) : null;
   }
-  if (PUBLIC_PAGES.has(pathname) || pathname.startsWith("/g/") || signedIn) return null;
+  if (PUBLIC_PAGES.has(pathname) || isGuestPage(pathname) || signedIn) return null;
   return loginPath(`${pathname}${search}`);
 }

@@ -22,7 +22,7 @@ what to pay without an account or a second link.
 - apps/web/app/api/receipts/[id]/group-link/route.ts: owner POST and DELETE.
 - apps/web/app/api/groups/[token]/route.ts and claim/route.ts: anonymous GET
   and POST claim, with no derived user identity.
-- apps/web/app/lib/page-access.ts: public `/g/` page-path exception.
+- apps/web/app/lib/page-access.ts: public `/g/` and `/p/` page-path exceptions.
 - apps/web/tests/group-links-route.test.ts: group API integration coverage.
 - apps/db-server/drills/group-links.ts and apps/web/drills/group-links.ts:
   isolated PostgreSQL contention and live HTTP verification.
@@ -45,8 +45,10 @@ what to pay without an account or a second link.
   (owner-scoped).
 - apps/web/app/api/receipts/[id]/picks/route.ts: PUT the organizer's own
   picks (owner-scoped).
-- apps/web/app/p/[token]/: the guest page, picking before finalize and the
-  split summary after (see Known gaps).
+- apps/web/app/p/[token]/: the server guest page, draft picker, request
+  controller, loading/error boundaries and server-only finalized summary.
+- apps/web/tests/guest-pick-page.test.ts and guest-pick-session.test.ts:
+  page projections, markup, request ordering and failure recovery.
 - apps/web/tests/picks-route.test.ts and picking-route.test.ts.
 
 ## Behavior
@@ -239,6 +241,47 @@ what to pay without an account or a second link.
   done action stays reachable without horizontal scrolling.
 - Invalid input 400. Failures roll back all changes.
 
+### Guest page
+
+- `/p/<token>` is public for signed-out visitors; `/p`, `/people` and other
+  protected paths still require sign-in. It has no receipt step bar or account
+  menu, including when the browser holds an organizer session.
+- The server reads `getPicks` directly, dynamically, without an HTTP request
+  to itself. Unknown links show "This link isn't valid" with no receipt data;
+  other failures show a generic retry card, never the underlying error.
+- Draft items are ordered by line number, with their name, quantity, price
+  in the receipt currency and other pickers' names. Each labeled checkbox row
+  is at least 44px tall and toggles across its full width. The token holder,
+  never the signed-in account, determines the checked items.
+- Changes show immediately. One PUT is in flight at a time; later taps are
+  coalesced into the next complete item set. A response updates the confirmed
+  projection without discarding later taps. Failed writes discard queued
+  changes, restore the last confirmed picks and show an explanatory toast
+  and inline retry. A network failure may have committed, so retry refreshes
+  the projection before allowing more writes.
+- **I'm done** waits for outstanding saves before POSTing. Only a successful
+  response confirms submission. A later selection clears the visible done
+  state immediately; the successful PUT clears it on the server too.
+- While editing, rows are read-only and the page says "The organizer is
+  making changes. Check back in a minute." with **Check again**. A button
+  press or a visible window regaining focus refreshes GET, with no polling.
+  Refreshes and writes are serialized. A 409 refreshes the projection before
+  any further write; a write 404 also refreshes because an item may have been
+  removed while the personal link remains valid. Only a GET 404 invalidates
+  the link. Failed refreshes leave writes disabled until a successful retry.
+- Closing or navigating away with a request outstanding uses the browser's
+  unsaved-change warning. Requests already sent may commit; reopening the
+  link always reads the server's current state.
+- Finalized links render everyone's already-calculated amount and settlement
+  state, plus **Pay <payer>** or a neutral message when the payer is unknown.
+  Money is formatted directly from decimal strings without floating-point
+  conversion or recalculation. The summary includes no picker or mutating
+  controls. A draft refresh that discovers finalization refreshes the server
+  page to replace the picker with this server-rendered summary.
+- The HTML, including loading and error responses, is not cached and sends
+  `Referrer-Policy: no-referrer` and `X-Robots-Tag: noindex`. Title,
+  description, Open Graph and Twitter metadata say only "Split Bill".
+
 ## Examples
 
 | State / input | Behavior |
@@ -272,6 +315,13 @@ what to pay without an account or a second link.
 
 ## Verify
 
+- `guest-pick-page.test.ts` checks public access, generic metadata, guest
+  headers, invalid versus retryable failures, checkbox labels and initial
+  picks, editing/submitted states, and every finalized participant's amount,
+  settlement and payer with no picker controls.
+- `guest-pick-session.test.ts` exercises full-set writes, rapid taps, save
+  rollback, queued done, done failure, focus refresh without polling, mode
+  conflicts, removed items, revoked links and draft-to-finalized handoff.
 - pnpm test (group-links-route.test.ts) covers owner authentication and scope,
   issue/rotate/idempotent revoke in both draft modes and after finalize,
   hash-only storage, the identical 404 family, read-only GET, exact draft and
@@ -298,6 +348,12 @@ what to pay without an account or a second link.
   an isolated database session, and stops both servers and removes temporary
   data on completion. It does not open the development cluster or a shared
   database. Raw credentials are not printed.
+  The live HTTP drill also requests personal guest HTML signed out and with
+  an owner session, checks Editing, Picking, submitted, finalized and rotated
+  states, confirms the owner's submitted timestamp, generic metadata,
+  account-menu omission and privacy headers, and verifies protected routes
+  still redirect to login. These HTTP checks do not replace the phone and
+  keyboard browser passes below.
 - Append `--dev` to the isolated drill command to exercise the same HTTP flow
   under `next dev --turbopack`, including absence of tokens from request logs.
 - Lock drill uses an isolated local PostgreSQL database with independent
@@ -341,11 +397,9 @@ what to pay without an account or a second link.
 These statements above are contract, not yet fact. A PR that closes one
 deletes its line from this section.
 
-- **The guest page does not exist.** `apps/web/app/p/[token]/` is not built,
-  so the page metadata, `Referrer-Policy` and `X-Robots-Tag` headers, the
-  phone-first layout, and the private-window, phone and finalize drills are
-  not yet true. `apps/web/middleware.ts` also redirects signed-out page
-  requests to sign-in, so `/p/` must be exempted when the page lands.
+- **Guest visual verification remains pending.** The HTTP and automated
+  markup/controller drills cover the guest flow; the 375px phone and
+  keyboard-only browser passes still require visual verification.
 - **The group page and organizer sharing controls do not exist.** The group
   API and public `/g/` path rule do not provide a working `/g/[token]` page.
   Name confirmation, browser-local "Continue as" and sharing/claimed UI are

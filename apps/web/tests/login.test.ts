@@ -34,6 +34,13 @@ describe("pageRedirect", () => {
     }
   });
 
+  it("allows personal guest links without exposing similarly named or organizer pages", () => {
+    expect(pageRedirect("/p/token", "", false)).toBeNull();
+    for (const path of ["/p", "/people", "/picks/token", "/participants", "/receipts/new"]) {
+      expect(pageRedirect(path, "", false)).toBe(`/login?callbackUrl=${encodeURIComponent(path)}`);
+    }
+  });
+
   it("sends signed-out visitors of protected pages to /login with their destination", () => {
     expect(pageRedirect("/receipts/abc", "?tab=bills", false)).toBe("/login?callbackUrl=%2Freceipts%2Fabc%3Ftab%3Dbills");
   });
