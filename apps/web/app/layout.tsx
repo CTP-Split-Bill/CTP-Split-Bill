@@ -2,6 +2,7 @@
 // header and its account slot, the content column, and the toast host.
 // Shell and tokens: docs/specs/components.md.
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { unstable_rethrow } from "next/navigation";
 import { Suspense } from "react";
 import { currentUserId, signOut } from "@project/auth";
@@ -10,6 +11,7 @@ import { log } from "@project/log";
 import { UserMenu } from "./components/UserMenu";
 import { Skeleton } from "./components/ui/skeleton";
 import { Toaster } from "./components/ui/sonner";
+import { GUEST_PAGE_HEADER } from "./lib/page-access";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -26,6 +28,7 @@ async function signOutAction() {
 // Streams in on its own so no page waits on the profile read. A failed read
 // still renders the menu, so sign-out stays reachable.
 async function AccountSlot() {
+  if ((await headers()).get(GUEST_PAGE_HEADER) === "1") return null;
   let userId: string;
   try {
     userId = await currentUserId();
