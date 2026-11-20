@@ -18,12 +18,14 @@ a stale editor must not overwrite or finalize someone else's newer draft.
 ## Behavior
 
 - JSON requires expectedRevision plus at least one editable field.
-- Editable fields are title, merchantName, address, purchasedAt, subtotal, tax,
-  tip, total, paidByParticipantId, splitMode and reviewConfirmed.
+- Editable fields are title, merchantName, address, purchasedAt, subtotal,
+  discount, tax, tip, total, paidByParticipantId, splitMode and reviewConfirmed.
 - Metadata can be null. Non-null title/name/address are trimmed, nonblank and
   bounded to 100/200/500 characters. Dates require ISO datetime with an offset.
 - Money is a nonnegative decimal string, at most two fractional and ten integer
   digits; raw strings are bounded to 64 characters. Amount fields may be null.
+  Discount is optional and nullable, and cannot exceed subtotal when both are
+  present. A discount larger than subtotal is rejected with 400.
 - Split mode is EVEN, ITEMIZED or SHARED_ITEMS. Payer is null or a participant
   of this receipt; unknown/foreign participants return 404.
 - Unknown fields, including ownerId/status/revision, are ignored.
@@ -32,6 +34,9 @@ a stale editor must not overwrite or finalize someone else's newer draft.
   while picking is open (receipts/guest-picks.md).
 - One transaction locks and advances revision before updates. Failures roll
   back fields, revision and any allocation cleanup.
+- Reconciliation is `subtotal - discount + tax + tip = total`; a null discount
+  means zero. Items continue to sum to the undiscounted subtotal. Values are
+  checked in integer cents during confirmation and finalization.
 - Content/monetary corrections clear reviewedAt. Split/payer changes advance
   revision while retaining confirmation of the receipt information.
 - Switching to EVEN clears individual and shared allocations. Switching to
@@ -61,6 +66,9 @@ a stale editor must not overwrite or finalize someone else's newer draft.
 
 ## Constraints & decisions
 
+- The discount is receipt-level because the printed promotion may apply to the
+  whole bill without identifying a specific item; item prices remain
+  nonnegative and the pre-discount subtotal remains the sum of items.
 - The lock also coordinates item/assignment/finalization transactions.
 - Inconsistent draft amounts may be saved for correction; confirmation and
   finalization require reconciliation. No bill totals are accepted here.
@@ -68,5 +76,6 @@ a stale editor must not overwrite or finalize someone else's newer draft.
 
 ## Out of scope
 
-- Item collection replacement: items.md.
+- Item collection replacement: items.md. Item-level discounts are not modeled;
+  they may be proposed as a future feature.
 - Upload/OCR, participant editing and finalized financial edits are separate work.

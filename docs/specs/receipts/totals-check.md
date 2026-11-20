@@ -23,7 +23,8 @@ error when finalizing. The rule itself already exists; this makes it visible.
   values:
   - `itemsTotal`: sum of item totalPrice, or null if any item total is null.
   - `itemsDifference`: subtotal − itemsTotal, or null if either is null.
-  - `amountsDifference`: total − (subtotal + tax + tip), with null tip as zero,
+  - `amountsDifference`: total − (subtotal − discount + tax + tip), with null
+    discount and tip as zero,
     or null if subtotal, tax or total is null.
   - `reconciled`: true only when both differences are exactly "0.00".
   Amounts are two-decimal strings, matching bills/list.md.
@@ -39,7 +40,7 @@ error when finalizing. The rule itself already exists; this makes it visible.
 
 | Items / amounts | totals |
 |---|---|
-| Items 61.50, subtotal 64.00, tax 5.68, tip 11.52, total 81.20 | itemsDifference "2.50", amountsDifference "0.00", reconciled false |
+| Items 61.50, subtotal 64.00, discount 0.00, tax 5.68, tip 11.52, total 81.20 | itemsDifference "2.50", amountsDifference "0.00", reconciled false |
 | Items 64.00, same amounts | both "0.00", reconciled true |
 | One item with null totalPrice | itemsTotal null, itemsDifference null, reconciled false |
 | Finalize while itemsDifference is "2.50" | 400; no bills |
@@ -55,10 +56,12 @@ error when finalizing. The rule itself already exists; this makes it visible.
 - No "finalize anyway". Bills must reconcile to the receipt to the cent
   (bills/split-allocation.md), so an unexplained gap is never silently spread
   across people.
-- Differences are signed, so the UI can say "short" or "over".
+- Differences are signed, so the UI can say "short" or "over". Items continue
+  to reconcile to the pre-discount subtotal; only the amount equation includes
+  the receipt-level discount.
 
 ## Out of scope
 
-- An explicit adjustment line (service fee, discount) as its own item type.
-  Today it is entered as an ordinary item.
+- Item-level discounts and explicit adjustment-line item types. The
+  receipt-level discount is described by receipts/edit.md.
 - OCR confidence or per-line warnings (upload/parse work, unspecified).

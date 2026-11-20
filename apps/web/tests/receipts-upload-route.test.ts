@@ -85,7 +85,7 @@ describe("receipt photo uploads", () => {
       organizerParticipantId: expect.any(String), picksOpenedAt: null, hasGroupLink: false,
       status: "DRAFT", parseStatus: "NOT_STARTED", splitMode: "EVEN", revision: 1,
       reviewedAt: null, finalizedAt: null, merchantName: null, address: null,
-      purchasedAt: null, currency: "USD", subtotal: null, tax: null, tip: null,
+      purchasedAt: null, currency: "USD", subtotal: null, discount: null, tax: null, tip: null,
       total: null, createdAt: expect.any(String), updatedAt: expect.any(String),
       participants: [{
         id: expect.any(String), displayName: "Owner", phone: null, email: null,

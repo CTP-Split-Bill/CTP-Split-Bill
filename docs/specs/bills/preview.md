@@ -5,7 +5,7 @@ type: feature
 
 ## Why
 
-The organizer checks each participant's subtotal, tax, tip and amount owed
+The organizer checks each participant's subtotal, discount, tax, tip and amount owed
 before finalization creates the bill snapshots.
 
 ## Where it lives
@@ -26,7 +26,8 @@ before finalization creates the bill snapshots.
 - A RepeatableRead transaction reads a consistent snapshot of the receipt and
   its participants, items and shared allocations.
 - The response is 200 with receiptId, revision, currency and allocations.
-  Each allocation has participantId, subtotal, taxShare, tipShare and amountOwed.
+  Each allocation has participantId, subtotal, discountShare, taxShare,
+  tipShare and amountOwed.
   Amounts are decimal strings with two places, ordered by participant joinedAt
   then id, using the existing exact-cent calculator for all three split modes.
 - Preview does not create bills, advance revision, change review/status/times,
@@ -39,7 +40,7 @@ before finalization creates the bill snapshots.
 | State / input | Result |
 |---|---|
 | EVEN: 10.00 among three participants | 3.34 / 3.33 / 3.33; draft unchanged |
-| Personal 20.00 and 10.00; tax 2.70, tip 6.00 | 25.80 / 12.90 |
+| Personal 20.00 and 10.00; discount 3.00, tax 2.70, tip 6.00 | Discount is proportional to item subtotals; preview agrees with finalization |
 | One 20.00 personal item and a shared 10.00 item | The existing SHARED_ITEMS calculation is returned |
 | Preview then finalize the same revision | Bill amounts match the preview |
 | Stale expectedRevision | 409; no changes |

@@ -436,9 +436,9 @@ describe("a finalized receipt", () => {
     const body = await res.json();
     expect(body).toMatchObject({ status: "FINALIZED", paidBy: "Alex", participantId: d.sam.id });
     expect(body.participants).toEqual([
-      { id: d.alex.id, displayName: "Alex", amountOwed: "10.00", settled: true },
-      { id: d.maya.id, displayName: "Maya", amountOwed: "12.00", settled: false },
-      { id: d.sam.id, displayName: "Sam", amountOwed: "0.00", settled: true },
+      { id: d.alex.id, displayName: "Alex", discountShare: "0.00", amountOwed: "10.00", settled: true },
+      { id: d.maya.id, displayName: "Maya", discountShare: "0.00", amountOwed: "12.00", settled: false },
+      { id: d.sam.id, displayName: "Sam", discountShare: "0.00", amountOwed: "0.00", settled: true },
     ]);
     expectNoPrivateData(body);
   });

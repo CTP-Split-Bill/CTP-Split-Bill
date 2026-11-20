@@ -104,7 +104,7 @@ export async function completeReceiptParsing(userId: string, receiptId: string, 
       data: {
         merchantName: extracted.merchantName, address: extracted.address,
         purchasedAt: extracted.purchasedAt, subtotal: extracted.subtotal,
-        tax: extracted.tax, tip: extracted.tip, total: extracted.total,
+        discount: null, tax: extracted.tax, tip: extracted.tip, total: extracted.total,
         extraction: { text: text as string }, parseStatus: "SUCCEEDED", parseError: null,
         reviewedAt: null, revision: { increment: 1 },
       },

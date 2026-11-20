@@ -8,14 +8,15 @@ export type ReceiptForm = {
   merchant: string;
   date: string; // YYYY-MM-DD or ""
   subtotal: string;
+  discount: string;
   tax: string;
   tip: string;
   total: string;
   rows: FormRow[];
 };
 
-export type MoneyField = "subtotal" | "tax" | "tip" | "total";
-export const MONEY_FIELDS: MoneyField[] = ["subtotal", "tax", "tip", "total"];
+export type MoneyField = "subtotal" | "discount" | "tax" | "tip" | "total";
+export const MONEY_FIELDS: MoneyField[] = ["subtotal", "discount", "tax", "tip", "total"];
 
 export type EditorReceipt = {
   id: string;
@@ -34,7 +35,7 @@ export const MESSAGES = {
   noItems: "Add at least one item",
   missingTotals: "Fill in the subtotal, tax and total",
   itemsMismatch: "Items don't add up to the subtotal yet",
-  amountsMismatch: "Subtotal + tax + tip doesn't match the total yet",
+  amountsMismatch: "Subtotal minus discount plus tax and tip doesn't match the total yet",
   fixFields: "Fix the highlighted fields",
 } as const;
 
@@ -75,6 +76,7 @@ export function toEditorReceipt(r: {
   merchantName: string | null;
   purchasedAt: Date | string | null;
   subtotal: Stored;
+  discount?: Stored;
   tax: Stored;
   tip: Stored;
   total: Stored;
@@ -91,6 +93,7 @@ export function toEditorReceipt(r: {
       merchant: r.merchantName ?? "",
       date: purchased,
       subtotal: moneyText(r.subtotal),
+      discount: moneyText(r.discount ?? null),
       tax: moneyText(r.tax),
       tip: moneyText(r.tip),
       total: moneyText(r.total),
@@ -188,6 +191,11 @@ export function formErrors(form: ReceiptForm): FormErrors {
   for (const field of MONEY_FIELDS) {
     if (form[field].trim() !== "" && toCents(form[field]) === null) errors.fields[field] = MESSAGES.money;
   }
+  const subtotal = toCents(form.subtotal);
+  const discount = toCents(form.discount);
+  if (subtotal !== null && discount !== null && discount > subtotal) {
+    errors.fields.discount = "Discount cannot exceed subtotal";
+  }
   for (const row of itemRows(form)) {
     const e: RowErrors = {};
     if (row.name.trim() === "") e.name = MESSAGES.name;
@@ -247,7 +255,7 @@ export type Totals = {
   itemsCents: number | null;
   // subtotal − items; positive means the items are short.
   itemsDiff: number | null;
-  // total − (subtotal + tax + tip); positive means the parts are short.
+  // total − (subtotal − discount + tax + tip); positive means the parts are short.
   amountsDiff: number | null;
   partsCents: number | null;
 };
@@ -257,10 +265,13 @@ export function totals(form: ReceiptForm): Totals {
   const prices = rows.map((row) => toCents(row.price));
   const itemsCents = rows.length > 0 && prices.every((p) => p !== null) ? prices.reduce<number>((a, p) => a + p!, 0) : rows.length === 0 ? 0 : null;
   const subtotal = toCents(form.subtotal);
-  const tax = toCents(form.tax);
+  const discount = form.discount.trim() === "" ? 0 : toCents(form.discount);
+  // Empty tax is zero for the live estimate so Discount and Tip changes show
+  // immediately; Confirm still requires the organizer to enter Tax.
+  const tax = form.tax.trim() === "" ? 0 : toCents(form.tax);
   const tip = form.tip.trim() === "" ? 0 : toCents(form.tip);
   const total = toCents(form.total);
-  const partsCents = subtotal !== null && tax !== null && tip !== null ? subtotal + tax + tip : null;
+  const partsCents = subtotal !== null && discount !== null && tax !== null && tip !== null ? subtotal - discount + tax + tip : null;
   return {
     itemsCents,
     itemsDiff: subtotal !== null && itemsCents !== null ? subtotal - itemsCents : null,
@@ -278,10 +289,10 @@ export function setSubtotalTo(form: ReceiptForm, t: Totals): string | null {
   return displayMoney(t.itemsCents);
 }
 
-// What "Set total to $X" would write: subtotal + tax + tip, offered only while
+// What "Set total to $X" would write: subtotal − discount + tax + tip, offered only while
 // Total is empty.
 export function setTotalTo(form: ReceiptForm, t: Totals): string | null {
-  if (form.total.trim() !== "" || t.partsCents === null) return null;
+  if (form.total.trim() !== "" || form.tax.trim() === "" || t.partsCents === null || t.partsCents < 0) return null;
   return displayMoney(t.partsCents);
 }
 
@@ -375,6 +386,7 @@ function fieldValues(form: ReceiptForm) {
     // Noon UTC keeps the same calendar date in every time zone.
     purchasedAt: form.date === "" ? null : `${form.date}T12:00:00.000Z`,
     subtotal: moneyValue(form.subtotal),
+    discount: moneyValue(form.discount),
     tax: moneyValue(form.tax),
     tip: moneyValue(form.tip),
     total: moneyValue(form.total),

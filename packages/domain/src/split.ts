@@ -3,6 +3,7 @@ import { ApiError } from "./errors";
 export interface SplitInput {
   splitMode: "EVEN" | "ITEMIZED";
   subtotal: bigint;
+  discount?: bigint;
   tax: bigint;
   tip: bigint;
   members: { id: string; joinedAt: Date }[];
@@ -12,6 +13,7 @@ export interface SplitInput {
 export interface MemberAllocation {
   memberId: string;
   subtotal: bigint;
+  discountShare: bigint;
   taxShare: bigint;
   tipShare: bigint;
   amountOwed: bigint;
@@ -65,9 +67,33 @@ function roundColumn(total: bigint, exact: Fraction[]): bigint[] {
   return rounded;
 }
 
+function roundColumnCapped(total: bigint, exact: Fraction[], caps: bigint[]): bigint[] {
+  const rounded = exact.map((value) => value.numerator / value.denominator);
+  if (rounded.some((value, index) => value > caps[index])) {
+    throw new Error("Rounded split exceeds a member's allocation capacity");
+  }
+  let remaining = total - rounded.reduce((sum, value) => sum + value, 0n);
+  const order = exact.map((value, index) => ({
+    index, remainder: value.numerator % value.denominator, denominator: value.denominator,
+  })).sort((a, b) => {
+    const difference = a.remainder * b.denominator - b.remainder * a.denominator;
+    return difference > 0n ? -1 : difference < 0n ? 1 : a.index - b.index;
+  });
+  for (const entry of order) {
+    if (remaining === 0n) break;
+    if (rounded[entry.index] < caps[entry.index]) {
+      rounded[entry.index] += 1n;
+      remaining -= 1n;
+    }
+  }
+  if (remaining !== 0n) throw new Error("Capped split column does not balance");
+  return rounded;
+}
+
 export function allocateSplit(input: SplitInput): MemberAllocation[] {
   const invalid = (message: string): never => { throw new ApiError("INVALID_INPUT", message, 400); };
-  if (input.subtotal <= 0n || input.tax < 0n || input.tip < 0n) invalid("Receipt amounts are invalid");
+  const discount = input.discount ?? 0n;
+  if (input.subtotal <= 0n || discount < 0n || discount > input.subtotal || input.tax < 0n || input.tip < 0n) invalid("Receipt amounts are invalid");
   if (input.members.length === 0) invalid("Receipt has no participants");
   const members = [...input.members].sort((a, b) =>
     a.joinedAt.getTime() - b.joinedAt.getTime() || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
@@ -107,11 +133,16 @@ export function allocateSplit(input: SplitInput): MemberAllocation[] {
   ));
   const taxShare = proportionalColumn(input.tax);
   const tipShare = proportionalColumn(input.tip);
+  const discountExact = exactSubtotals.map((value) =>
+    fraction(discount * value.numerator, input.subtotal * value.denominator),
+  );
+  const discountShare = roundColumnCapped(discount, discountExact, subtotal);
   return members.map((member, index) => ({
     memberId: member.id,
     subtotal: subtotal[index],
+    discountShare: discountShare[index],
     taxShare: taxShare[index],
     tipShare: tipShare[index],
-    amountOwed: subtotal[index] + taxShare[index] + tipShare[index],
+    amountOwed: subtotal[index] + taxShare[index] + tipShare[index] - discountShare[index],
   }));
 }

@@ -71,7 +71,7 @@ beforeAll(async () => {
     participants: { create: { id: "paid-foreign-person", displayName: "Other" } },
   } });
 
-  // One bill per person. amountOwed must equal subtotal + tax + tip
+  // One bill per person. amountOwed includes the allocated discount.
   // (another database check), so 15.00 + 1.35 + 3.00 = 19.35.
   const amounts = { subtotal: "15.00", taxShare: "1.35", tipShare: "3.00", amountOwed: "19.35" };
   await prisma.bill.createMany({ data: [

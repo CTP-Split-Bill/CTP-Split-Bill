@@ -5,11 +5,13 @@ type: feature
 
 ## Why
 
-The organizer needs a reconciled, deterministic final breakdown whose food,
-tax, tip and total columns match the corrected restaurant receipt.
+The organizer needs a reconciled, deterministic final breakdown whose item
+subtotal, discount, tax, tip and total match the corrected restaurant receipt.
 
 ## Where it lives
 
+- packages/db/prisma/schema.prisma and an append-only migration: Receipt.discount
+  and the immutable Bill.discountShare snapshot.
 - packages/domain/src/split.ts: unchanged pure BigInt/fraction allocator.
 - packages/domain/src/bills.ts: owner-locked finalization and shared preview/finalization input translation.
 - apps/web/app/api/receipts/[id]/finalize/route.ts: POST.
@@ -22,20 +24,25 @@ tax, tip and total columns match the corrected restaurant receipt.
   or stale state 409, and so does a receipt with picking open
   (receipts/guest-picks.md). A receipt is locked and revision advanced transactionally.
 - Receipt information must be reviewed, items verified and complete, subtotal
-  positive, amounts nonnegative, items summed to subtotal, and subtotal + tax +
-  tip equal total. Null tip means zero. At least one participant is required.
+  positive, amounts nonnegative, items summed to subtotal, and subtotal −
+  discount + tax + tip equal total. Null discount and tip mean zero; discount
+  cannot exceed subtotal. At least one participant is required.
 - EVEN permits no assignments and divides subtotal equally among participants.
 - ITEMIZED requires one personal assignee per item and no shared rows.
 - SHARED_ITEMS permits either one assignee or at least two equal shared rows
   per item, never both. All references belong to this receipt.
 - Personal items translate into one weight-1 input. Shared items translate into
   weight-1 inputs per participant. Both reuse the existing ITEMIZED arithmetic.
-- Tax and tip are proportional to exact, unrounded item subtotals.
-- Each of subtotal, tax and tip is rounded independently by largest remainder:
+- Discount, tax and tip are proportional to exact, unrounded item subtotals.
+- Each of subtotal, discount, tax and tip is rounded independently by largest remainder:
   floor exact fractions, distribute leftover cents by largest fractional part,
   then break ties by participant joinedAt and id.
-- amountOwed is subtotal + taxShare + tipShare. Every column and the final total
-  reconcile exactly. Zero-subtotal participants receive zero tax and tip.
+- amountOwed is subtotal + taxShare + tipShare − discountShare. Discount shares
+  use the same exact unrounded item weights as tax and tip, with cent rounding
+  constrained so no participant's amountOwed is negative; leftover cents go by
+  largest remainder, then joinedAt and id, among shares that fit their remaining
+  capacity. Every column and the final total reconcile exactly. Zero-subtotal
+  participants receive zero tax, tip and discount.
 - One transaction creates one Bill per participant, marks FINALIZED and records
   finalizedAt. Any insertion/status failure restores the draft and revision.
 - Repeated or competing finalization produces one success and a 409, with no
@@ -49,6 +56,7 @@ tax, tip and total columns match the corrected restaurant receipt.
 |---|---|
 | EVEN: 10.00, three participants | 3.34 / 3.33 / 3.33 |
 | ITEMIZED: Alex 20.00, Sam 10.00; tax 2.70, tip 6.00 | 25.80 / 12.90 |
+| ITEMIZED: Alex 20.00, Sam 10.00; discount 3.00, no tax or tip | Alex 18.00 / Sam 9.00; bills sum to 27.00 |
 | SHARED_ITEMS: Alex steak 20.00; Alex+Sam appetizer 10.00; tax 2.70, tip 6.00 | 32.25 / 6.45 |
 | Missing assignment, unreviewed or inconsistent amounts | 400; no bills |
 | Two finalizers use one revision | One 200 and one 409 |
@@ -68,8 +76,10 @@ tax, tip and total columns match the corrected restaurant receipt.
 - Integer cents and reduced fractions preserve the existing calculation engine.
 - Bill amounts are snapshots and no arbitrary bill creation API exists.
 - totalPrice is authoritative; item quantity/unit-price equality is not imposed.
-- Discounts, service fees, percentage-tip intent and multiple tax lines are not
-  modeled. Corrected totals must obey the current reconciliation rule.
+- Receipt-level discounts are allocated proportionally, like tax and tip, and
+  are stored as discountShare in each immutable bill snapshot.
+  Item-level discounts, service fees, percentage-tip intent and multiple tax
+  lines are not modeled. Item-level discounts may be proposed as future work.
 - See ADR-0014 and ../receipts/model.md.
 
 ## Out of scope

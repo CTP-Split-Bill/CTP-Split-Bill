@@ -230,9 +230,9 @@ describe("anonymous group GET", () => {
     expect(body).toEqual(expected);
     expect(Object.keys(body).sort()).toEqual(["status", "revision", "merchantName", "purchasedAt", "currency", "items", "paidBy", "participants"].sort());
     expect(body.participants).toEqual([
-      { id: d.alex.id, displayName: "Alex", amountOwed: "4.00", settled: true },
-      { id: d.maya.id, displayName: "Maya", amountOwed: "4.00", settled: true },
-      { id: d.sam.id, displayName: "Sam", amountOwed: "0.00", settled: true },
+      { id: d.alex.id, displayName: "Alex", discountShare: "0.00", amountOwed: "4.00", settled: true },
+      { id: d.maya.id, displayName: "Maya", discountShare: "0.00", amountOwed: "4.00", settled: true },
+      { id: d.sam.id, displayName: "Sam", discountShare: "0.00", amountOwed: "0.00", settled: true },
     ]);
     noPrivateData(body);
     await prisma.bill.update({ where: { receiptId_participantId: { receiptId: d.receipt.id, participantId: d.maya.id } }, data: { paidAt: null } });

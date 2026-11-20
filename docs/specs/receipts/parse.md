@@ -38,7 +38,8 @@ instead of entering every value by hand, then reviews them before splitting.
   error or timeout. Setup documents any language-data provisioning separately
   from serving requests. Requests perform no language-data downloads.
 - Extraction recognizes conservative item-name/line-price pairs and explicitly
-  labelled subtotal, tax, tip and total values. Uncertain fields stay null;
+  labelled subtotal, tax, tip and total values. Receipt-level discounts remain
+  null for manual correction (receipts/edit.md). Uncertain fields stay null;
   missing unit price or quantity is not invented. Ambiguous metadata stays
   null. Discounts and unsupported layouts require manual correction.
 - At least one usable item is required for success. There are at most 500
@@ -46,7 +47,8 @@ instead of entering every value by hand, then reviews them before splitting.
   the existing schema bounds. Raw OCR text is internal extraction data.
 - Successful completion checks the same owner, receipt, PARSING state and
   attempt revision. In one transaction it replaces items, clears assignments
-  and shared allocations, saves extracted fields, clears reviewedAt, records
+  and shared allocations, saves extracted fields and clears any prior manual
+  discount, clears reviewedAt, records
   SUCCEEDED and advances revision. Participants and the selected payer remain;
   every participant's picksSubmittedAt is cleared (receipts/guest-picks.md).
   Items are unverified; existing review and finalization checks still apply.

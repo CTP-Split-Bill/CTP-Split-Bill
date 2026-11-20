@@ -99,7 +99,7 @@ beforeEach(async () => {
   const fields = {
     ownerId: "bill-alice", status: "DRAFT" as const, parseStatus: "SUCCEEDED" as const,
     splitMode: "SHARED_ITEMS" as const, revision: 1, reviewedAt, finalizedAt: null,
-    deletedAt: null, paidByParticipantId: null, subtotal: "30.00", tax: "2.70", tip: "6.00", total: "38.70",
+    deletedAt: null, paidByParticipantId: null, subtotal: "30.00", discount: null, tax: "2.70", tip: "6.00", total: "38.70",
   };
   await prisma.receipt.upsert({
     where: { id: receiptId }, update: fields,
@@ -369,6 +369,29 @@ describe.each(["assignments", "allocations"] as const)("%s reference checks and 
 });
 
 describe("POST preview", () => {
+  it("previews and persists a positive receipt discount in participant bills", async () => {
+    await prisma.receipt.update({ where: { id: receiptId }, data: { discount: "3.00", total: "35.70" } });
+    const response = await request("preview");
+    expect(response.status).toBe(200);
+    const preview = await response.json();
+    expect(preview.allocations).toEqual([
+      { participantId: alice, subtotal: "25.00", discountShare: "2.50", taxShare: "2.25", tipShare: "5.00", amountOwed: "29.75" },
+      { participantId: guest, subtotal: "5.00", discountShare: "0.50", taxShare: "0.45", tipShare: "1.00", amountOwed: "5.95" },
+      { participantId: charlie, subtotal: "0.00", discountShare: "0.00", taxShare: "0.00", tipShare: "0.00", amountOwed: "0.00" },
+    ]);
+    expect(preview.allocations.reduce((sum: bigint, bill: { amountOwed: string }) =>
+      sum + BigInt(bill.amountOwed.replace(".", "")), 0n)).toBe(3570n);
+
+    const finalized = await request("finalize", { expectedRevision: preview.revision });
+    expect(finalized.status, await finalized.clone().text()).toBe(200);
+    const bills = (await snapshot()).bills;
+    expect(bills.map(({ participantId, discountShare, amountOwed }) => [
+      participantId, discountShare.toFixed(2), amountOwed.toFixed(2),
+    ])).toEqual([
+      [alice, "2.50", "29.75"], [guest, "0.50", "5.95"], [charlie, "0.00", "0.00"],
+    ]);
+  });
+
   it.each(["EVEN", "ITEMIZED", "SHARED_ITEMS"] as const)("previews %s without writes and matches finalization", async (splitMode) => {
     if (splitMode !== "SHARED_ITEMS") {
       await prisma.sharedItemAllocation.deleteMany({ where: { receiptId } });
@@ -386,7 +409,7 @@ describe("POST preview", () => {
     expect(preview).toEqual({
       receiptId, revision: 1, currency: "USD",
       allocations: [alice, guest, charlie].map((participantId) => ({
-        participantId, subtotal: expect.any(String), taxShare: expect.any(String),
+        participantId, subtotal: expect.any(String), discountShare: expect.any(String), taxShare: expect.any(String),
         tipShare: expect.any(String), amountOwed: expect.any(String),
       })),
     });
@@ -403,8 +426,8 @@ describe("POST preview", () => {
 
     expect((await request("finalize", { expectedRevision: preview.revision })).status).toBe(200);
     const finalized = await snapshot();
-    expect(finalized.bills.map(({ participantId, subtotal, taxShare, tipShare, amountOwed }) => ({
-      participantId, subtotal: subtotal.toFixed(2), taxShare: taxShare.toFixed(2),
+    expect(finalized.bills.map(({ participantId, subtotal, discountShare, taxShare, tipShare, amountOwed }) => ({
+      participantId, subtotal: subtotal.toFixed(2), discountShare: discountShare.toFixed(2), taxShare: taxShare.toFixed(2),
       tipShare: tipShare.toFixed(2), amountOwed: amountOwed.toFixed(2),
     }))).toEqual(preview.allocations);
   });
@@ -420,9 +443,9 @@ describe("POST preview", () => {
     const response = await request("preview");
     expect(response.status).toBe(200);
     expect((await response.json()).allocations).toEqual([
-      { participantId: alice, subtotal: "3.34", taxShare: "0.00", tipShare: "0.00", amountOwed: "3.34" },
-      { participantId: guest, subtotal: "3.33", taxShare: "0.00", tipShare: "0.00", amountOwed: "3.33" },
-      { participantId: charlie, subtotal: "3.33", taxShare: "0.00", tipShare: "0.00", amountOwed: "3.33" },
+      { participantId: alice, subtotal: "3.34", discountShare: "0.00", taxShare: "0.00", tipShare: "0.00", amountOwed: "3.34" },
+      { participantId: guest, subtotal: "3.33", discountShare: "0.00", taxShare: "0.00", tipShare: "0.00", amountOwed: "3.33" },
+      { participantId: charlie, subtotal: "3.33", discountShare: "0.00", taxShare: "0.00", tipShare: "0.00", amountOwed: "3.33" },
     ]);
     expect(await snapshot()).toEqual(before);
   });
@@ -613,13 +636,13 @@ describe("GET receipt bills", () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual([
       { id: expect.any(String), receiptId, participantId: alice, displayName: "Alice", phone: null,
-        subtotal: "25.00", taxShare: "2.25", tipShare: "5.00", amountOwed: "32.25", paidAt: null,
+        subtotal: "25.00", discountShare: "0.00", taxShare: "2.25", tipShare: "5.00", amountOwed: "32.25", paidAt: null,
         settled: true, outstandingAmount: "0.00", createdAt: expect.any(String) },
       { id: expect.any(String), receiptId, participantId: guest, displayName: "Guest", phone: "+12125550123",
-        subtotal: "5.00", taxShare: "0.45", tipShare: "1.00", amountOwed: "6.45", paidAt: null,
+        subtotal: "5.00", discountShare: "0.00", taxShare: "0.45", tipShare: "1.00", amountOwed: "6.45", paidAt: null,
         settled: false, outstandingAmount: "6.45", createdAt: expect.any(String) },
       { id: expect.any(String), receiptId, participantId: charlie, displayName: "Charlie", phone: null,
-        subtotal: "0.00", taxShare: "0.00", tipShare: "0.00", amountOwed: "0.00", paidAt: null,
+        subtotal: "0.00", discountShare: "0.00", taxShare: "0.00", tipShare: "0.00", amountOwed: "0.00", paidAt: null,
         settled: true, outstandingAmount: "0.00", createdAt: expect.any(String) },
     ]);
     expect(await snapshot()).toEqual(before);
