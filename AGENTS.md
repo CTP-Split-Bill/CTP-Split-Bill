@@ -17,6 +17,7 @@ pnpm install
 pnpm prisma:generate     # typed DB client — run after schema changes
 pnpm dev                 # web + worker + embedded Postgres + Azurite
 pnpm db:seed             # demo user + starter rows (dev must be running)
+pnpm db:seed:examples    # example finalized receipts for your signed-in account
 pnpm test                # unit + integration (PGlite — no services needed)
 pnpm typecheck
 pnpm build

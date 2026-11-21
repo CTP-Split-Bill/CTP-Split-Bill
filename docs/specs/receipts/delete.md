@@ -51,7 +51,8 @@ and reverse a deletion using the same receipt ID and guest links.
   A summary-read failure rolls back the restoration.
 - Success returns 200 with exactly the existing ReceiptSummary fields: id,
   status, nullable merchantName/title/total/payerName, ISO createdAt,
-  participantCount and nullable settled. Money has two decimal places and
+  participantCount, nullable settled/unpaidCount/outstanding/nextStep/picks
+  (bills/list-screen.md). Money has two decimal places and
   settlement uses the same projection as GET /api/receipts/summary. No token
   hashes, blob references or unrelated data are returned. Success revalidates `/`.
 - Without an intervening delete, concurrent restores yield one 200 and one 409.
@@ -111,12 +112,13 @@ and reverse a deletion using the same receipt ID and guest links.
   deletion does not rotate or revoke guest tokens separately.
 - See ADR-0019 for the narrow restore exception; normal receiptScope is unchanged.
   Restoration lives in a separate module to reuse the summary projection without
-  creating a receipt/bill initialization cycle. No additional summary fields exist.
+  creating a receipt/bill initialization cycle. Restore returns the same summary
+  shape as the home list (bills/list-screen.md).
 
 ## Out of scope
 
-- Frontend deletion/Undo controls are separate work; this spec covers backend
-  deletion and restoration only.
+- The home list's delete menu, confirmation and Undo toast are specified in
+  [../bills/list-screen.md](../bills/list-screen.md).
 - A deleted-receipt browser, permanent removal, photo cleanup and bulk deletion
   are not implemented.
 - Receipt corrections are specified in [edit.md](edit.md); bill settlement is

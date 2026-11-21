@@ -20,11 +20,12 @@ query plan or a currency decision into whatever screen renders it next.
   `CardContent`, `CardFooter`), `button.tsx` (`Button`, `buttonVariants`),
   `dropdown-menu.tsx` (`DropdownMenu` and its parts), `skeleton.tsx`
   (`Skeleton`), `alert.tsx` (`Alert`, `AlertTitle`, `AlertDescription`),
-  `sonner.tsx` (`Toaster`), `badge.tsx` (`Badge`, `badgeVariants`) and
+  `sonner.tsx` (`Toaster`), `badge.tsx` (`Badge`, `badgeVariants`),
   `table.tsx` (`Table`, `TableHeader`, `TableBody`, `TableRow`, `TableHead`,
-  `TableCell`).
+  `TableCell`), `checkbox.tsx` (`Checkbox`), and `toggle-group.tsx`
+  (`ToggleGroup`, `ToggleGroupItem`).
 - `apps/web/app/components/` (outside `ui/`) — **layer 2**, domain
-  components: `BillCard.tsx`, `UserMenu.tsx`, and the async-state blocks
+  components: `BillRow.tsx`, `UserMenu.tsx`, and the async-state blocks
   `LoadingState.tsx`, `EmptyState.tsx` and `ErrorState.tsx`.
 - `apps/web/app/lib/cn.ts` — `cn()`, the `clsx` + `tailwind-merge` helper
   layer-1 files merge `className` through.
@@ -78,9 +79,9 @@ query plan or a currency decision into whatever screen renders it next.
 4. **Display-ready props only.** Money and dates cross the boundary as
    strings already formatted for the screen. `Decimal` is never narrowed to
    `number` on the way in — see [split-allocation](bills/split-allocation.md).
-5. **Screen language, not column names.** `BillCard` takes `restaurant`,
-   `paidTo`, `partyCount`, `total`, `date` — the words on the page — not the
-   columns of `Bill` and `Receipt`.
+5. **Screen language, not column names.** `BillRow` takes `name`, `total`,
+   `date`, `status` — the words on the page — not the columns of `Bill` and
+   `Receipt`.
 6. **Our token names.** Layer-2 code styles with our semantic utilities
    (`text-ink-muted`, `bg-surface`), not shadcn's aliases, and carries no
    `dark:` utilities.
@@ -110,6 +111,8 @@ and nowhere else.
 | `--color-ink-muted` | `text-ink-muted` | labels and secondary text |
 | `--color-brand` / `--color-brand-ink` | `text-brand`, `bg-brand` / `text-brand-ink` | links and primary actions, and text on them |
 | `--color-danger` | `text-danger` | error text |
+| `--color-warning` | `text-warning`, `bg-warning` | waiting on someone else (guests picking, people who still owe) |
+| `--color-person-1` … `--color-person-6` / `--color-person-ink` | `bg-person-1` … `bg-person-6` / `text-person-ink` | avatar fills for people on a receipt, by roster position, and the initial on them; the same in both themes |
 | `--radius-card` | `rounded-card` | card corner radius |
 | `--font-sans` | `font-sans` | the system UI font stack |
 
@@ -165,6 +168,10 @@ header, `<main>` or toast host.
   375px viewport with no horizontal scroll.
 - **The account slot** is its own Suspense boundary, so a page never waits
   on it; while it loads it shows a `Skeleton` the size of the menu trigger.
+  - Guest `/p/` and `/g/` pages omit the slot, even with a session, as
+    required by receipts/flow.md. Middleware replaces the internal guest-page
+    request header on every page request; the shell never trusts a browser's
+    supplied value. No session/profile query runs for this slot on guest pages.
   - No session: the slot is empty and the header shows only the app name.
   - A session: the slot reads the profile in-process with `currentUserId()`
     and `getCurrentUser()`, the same query as
@@ -244,30 +251,31 @@ carries a `"use client"` of its own: each joins the client bundle through
 its caller. `EmptyState` with `actionHref` stays usable from a server
 component.
 
-### `BillCard`
+### `BillRow`
 
-`BillCard` renders one receipt summary into the card slots: `restaurant` in
-`CardTitle` inside the header; optional `status` (`ReactNode`) beside the
-title in the header; `paidTo` / `partyCount` / `total` in
-`CardContent` as a description list labelled `Paid to`, `People`, and
-`Total` (emphasised); and `date` in a `CardFooter` with a top divider
-and small muted text, behind the literal label `Date Created:`.
-
-Its display props map to data the caller must assemble and format:
+`BillRow` renders one receipt on the home list: `name` and `total` on the
+first line, the total right-aligned with tabular figures and never wrapping,
+the name truncated to one line; `status` then `date` on the second line in
+small text, joined by "·", with a dot before the status. `state` colours the
+dot and status (`brand`, `warning` or muted); the date stays muted. When
+`stepsDone` is a number, a five-segment step bar below fills that many
+segments in `brand`. `untitled` renders the name in muted ink.
 
 | Prop | Source | Caller's job |
 |---|---|---|
-| `restaurant` | `Receipt.merchantName` (nullable) | supply a fallback — the prop is `string`, not `string \| null` |
-| `paidTo` | `Receipt.paidByParticipantId` → `Participant.displayName` (payer nullable) | resolve the receipt-local participant and supply a fallback |
-| `partyCount` | count of participants billed on the receipt | count it in the query, not in the component |
-| `status` | receipt status and aggregate bill settlement | caller supplies a status Badge; omit when settlement is not applicable |
-| `total` | `Receipt.total`, a `Decimal` serialized as a string | format for display — the prop is `string` |
+| `name` | `Receipt.merchantName`, then `title` (both nullable) | supply the "Untitled receipt" fallback — the prop is `string` |
+| `untitled` | no merchant, title or total | decide it from the summary |
+| `total` | `Receipt.total`, a `Decimal` serialized as a string | format for display, "—" when null |
 | `date` | `Receipt.createdAt`, an ISO string | format for display |
+| `status` | next step, picks progress or settlement | word it (bills/list-screen.md) |
+| `state` | whose move it is: `your-move`, `waiting` or `done` | decide it from the summary |
+| `stepsDone` | a draft's `nextStep` position, 0–4 | null once finalized |
 
-`BillCard` presents a receipt summary; it does not decide which receipts exist
+`BillRow` is not a link and has no controls: the home list wraps it in the
+row link and, in Edit mode, adds the Delete button beside it. It does not decide which receipts exist
 or who may see one. That scoping is [the bills list screen](bills/list-screen.md), and the loading,
-empty, and error states around a list of these cards are the async-honesty
-standard in [web](web.md) — owned by the screen, not by the card.
+empty, and error states around the list are the async-honesty standard in
+[web](web.md) — owned by the screen, not by the row.
 
 ## Boundaries
 
@@ -278,8 +286,8 @@ standard in [web](web.md) — owned by the screen, not by the card.
 | The token set, the shadcn alias table, dark-mode behavior | Per-screen layout beyond the shell's content column |
 | How primitives are added and owned | Each primitive's internal markup — that is the generated file |
 
-The home screen maps summary results to `BillCard` through
-`toBillCardProps` in `apps/web/app/lib/format.ts`; that mapping formats raw
+The home screen maps summary results to `BillRow` through
+`toBillRowProps` in `apps/web/app/lib/format.ts`; that mapping formats raw
 money and date values before they reach the presenter.
 
 ## Verify
@@ -299,8 +307,8 @@ money and date values before they reach the presenter.
 - `apps/web/tests/components.test.ts` renders to static markup with literal
   props: `Card`'s slots appear in the order given (fails if `Card` stops
   rendering `children`), `Card` styles through the aliased tokens
-  (`bg-card`, `text-card-foreground`), and `BillCard` renders its formatted
-  display strings and optional status slot untouched. It also renders, from literal props:
+  (`bg-card`, `text-card-foreground`), and `BillRow` renders its formatted
+  display strings untouched. It also renders, from literal props:
   - `LoadingState`: a `role="status"` region with the label and exactly
     `rows` skeleton bars.
   - `EmptyState`: the title, message, and an action link with the given

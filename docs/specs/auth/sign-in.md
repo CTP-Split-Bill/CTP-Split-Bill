@@ -18,7 +18,8 @@ Organizers need a private, persistent identity so receipt and bill data stays av
 
 ## Behavior
 - A signed-out visitor can view the landing page, `/login`, `/api/health`, and `/api/auth/*`.
-- Group page paths under `/g/` are public; the page itself is separate UI
+- Personal pick pages under `/p/` are public and never require a session.
+  Group page paths under `/g/` are public; the page itself is separate UI
   work. Group GET/claim and personal pick-token APIs use token scope without
   a session (see [guest picks](../receipts/guest-picks.md)).
 - `/login` shows one card, centered on the screen, titled "Sign in to Split Bill" with the message "You need to sign in with GitHub to continue." and a "Continue with GitHub" button. GitHub is the only provider offered.
