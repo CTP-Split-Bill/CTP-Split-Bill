@@ -17,7 +17,7 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   identity.userId = "summary-owner";
-  await prisma.receipt.updateMany({ where: { id: { startsWith: "summary-" } }, data: { paidByParticipantId: null } });
+  await prisma.receipt.updateMany({ where: { id: { startsWith: "summary-" } }, data: { paidByParticipantId: null, organizerParticipantId: null } });
   await prisma.bill.deleteMany({ where: { receiptId: { startsWith: "summary-" } } });
   await prisma.receiptItem.deleteMany({ where: { receiptId: { startsWith: "summary-" } } });
   await prisma.participant.deleteMany({ where: { receiptId: { startsWith: "summary-" } } });
@@ -71,13 +71,83 @@ describe("GET /api/receipts/summary", () => {
     const response = await request();
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual([
-      { id: "summary-unpaid", status: "FINALIZED", merchantName: null, title: "Unpaid", total: "9.25", createdAt: "2026-03-01T00:00:00.000Z", payerName: null, participantCount: 1, settled: false },
-      { id: "summary-no-bills", status: "FINALIZED", merchantName: null, title: "No bills", total: "1.00", createdAt: "2026-02-20T00:00:00.000Z", payerName: null, participantCount: 0, settled: null },
-      { id: "summary-tie-a", status: "DRAFT", merchantName: null, title: "summary-tie-a", total: null, createdAt: "2026-02-15T00:00:00.000Z", payerName: null, participantCount: 0, settled: null },
-      { id: "summary-tie-b", status: "DRAFT", merchantName: null, title: "summary-tie-b", total: null, createdAt: "2026-02-15T00:00:00.000Z", payerName: null, participantCount: 0, settled: null },
-      { id: "summary-final", status: "FINALIZED", merchantName: null, title: "Dinner", total: "10.00", createdAt: "2026-02-01T00:00:00.000Z", payerName: "Pat", participantCount: 3, settled: true },
-      { id: "summary-draft", status: "DRAFT", merchantName: null, title: "Draft receipt", total: "12.50", createdAt: "2026-01-01T00:00:00.000Z", payerName: null, participantCount: 2, settled: null },
+      { id: "summary-unpaid", status: "FINALIZED", merchantName: null, title: "Unpaid", total: "9.25", createdAt: "2026-03-01T00:00:00.000Z", payerName: null, participantCount: 1, settled: false, unpaidCount: 1, outstanding: "9.25", nextStep: null, picks: null },
+      { id: "summary-no-bills", status: "FINALIZED", merchantName: null, title: "No bills", total: "1.00", createdAt: "2026-02-20T00:00:00.000Z", payerName: null, participantCount: 0, settled: null, unpaidCount: null, outstanding: null, nextStep: null, picks: null },
+      { id: "summary-tie-a", status: "DRAFT", merchantName: null, title: "summary-tie-a", total: null, createdAt: "2026-02-15T00:00:00.000Z", payerName: null, participantCount: 0, settled: null, unpaidCount: null, outstanding: null, nextStep: "scan", picks: null },
+      { id: "summary-tie-b", status: "DRAFT", merchantName: null, title: "summary-tie-b", total: null, createdAt: "2026-02-15T00:00:00.000Z", payerName: null, participantCount: 0, settled: null, unpaidCount: null, outstanding: null, nextStep: "scan", picks: null },
+      { id: "summary-final", status: "FINALIZED", merchantName: null, title: "Dinner", total: "10.00", createdAt: "2026-02-01T00:00:00.000Z", payerName: "Pat", participantCount: 3, settled: true, unpaidCount: 0, outstanding: "0.00", nextStep: null, picks: null },
+      { id: "summary-draft", status: "DRAFT", merchantName: null, title: "Draft receipt", total: "12.50", createdAt: "2026-01-01T00:00:00.000Z", payerName: null, participantCount: 2, settled: null, unpaidCount: null, outstanding: null, nextStep: "scan", picks: null },
     ]);
+  });
+
+  it("counts only the unsettled bills in unpaidCount", async () => {
+    await prisma.receipt.create({ data: {
+      id: "summary-partly", ownerId: "summary-owner", title: "Partly paid",
+      imageBlobName: "summary/partly.jpg", imageContentType: "image/jpeg",
+      status: "FINALIZED", subtotal: "30.00", tax: "0.00", tip: "0.00", total: "30.00",
+      finalizedAt: new Date("2026-04-01T00:00:00Z"), createdAt: new Date("2026-04-01T00:00:00Z"),
+      participants: { create: ["a", "b", "c"].map((p) => ({ id: `summary-partly-${p}`, displayName: p })) },
+      bills: { create: [
+        { participantId: "summary-partly-a", subtotal: "10", taxShare: "0", tipShare: "0", amountOwed: "10" },
+        { participantId: "summary-partly-b", subtotal: "10", taxShare: "0", tipShare: "0", amountOwed: "10" },
+        { participantId: "summary-partly-c", subtotal: "10", taxShare: "0", tipShare: "0", amountOwed: "10", paidAt: new Date() },
+      ] },
+    } });
+    const partly = (await (await request()).json()).find((r: { id: string }) => r.id === "summary-partly");
+    expect(partly).toMatchObject({ settled: false, unpaidCount: 2, outstanding: "20.00", nextStep: null, picks: null });
+  });
+
+  it("names a draft's next step with the step rules and clears it once finalized", async () => {
+    const id = "summary-steps";
+    const read = async () => (await (await request()).json()).find((r: { id: string }) => r.id === id);
+    await prisma.receipt.create({ data: {
+      id, ownerId: "summary-owner", title: "Steps", imageBlobName: "summary/steps.jpg",
+      imageContentType: "image/jpeg", status: "DRAFT", parseStatus: "PARSING", splitMode: "ITEMIZED",
+      participants: { create: [{ id: "summary-steps-me", displayName: "Me" }, { id: "summary-steps-guest", displayName: "Sam" }] },
+    } });
+    expect((await read()).nextStep).toBe("scan");
+    await prisma.receipt.update({ where: { id }, data: { parseStatus: "SUCCEEDED" } });
+    expect((await read()).nextStep).toBe("items");
+    await prisma.receipt.update({ where: { id }, data: { reviewedAt: new Date(), organizerParticipantId: "summary-steps-me" } });
+    await prisma.receiptItem.create({ data: { receiptId: id, lineNumber: 1, name: "Ramen", totalPrice: "12.00" } });
+    expect((await read()).nextStep).toBe("picks");
+    await prisma.receiptItem.updateMany({ where: { receiptId: id }, data: { assignedParticipantId: "summary-steps-guest" } });
+    expect((await read()).nextStep).toBe("finalize");
+    await prisma.receipt.update({ where: { id }, data: {
+      status: "FINALIZED", finalizedAt: new Date(), subtotal: "12.00", tax: "0.00", tip: "0.00", total: "12.00",
+    } });
+    expect((await read()).nextStep).toBeNull();
+  });
+
+  it("asks for people when the organizer is the only participant", async () => {
+    await prisma.receipt.create({ data: {
+      id: "summary-alone", ownerId: "summary-owner", title: "Alone", imageBlobName: "summary/alone.jpg",
+      imageContentType: "image/jpeg", status: "DRAFT", parseStatus: "SUCCEEDED", reviewedAt: new Date(),
+      participants: { create: [{ id: "summary-alone-me", displayName: "Me" }] },
+    } });
+    await prisma.receipt.update({ where: { id: "summary-alone" }, data: { organizerParticipantId: "summary-alone-me" } });
+    const alone = (await (await request()).json()).find((r: { id: string }) => r.id === "summary-alone");
+    expect(alone.nextStep).toBe("participants");
+  });
+
+  it("reports picks progress without counting the organizer", async () => {
+    const id = "summary-picks";
+    const read = async () => (await (await request()).json()).find((r: { id: string }) => r.id === id).picks;
+    await prisma.receipt.create({ data: {
+      id, ownerId: "summary-owner", title: "Picks", imageBlobName: "summary/picks.jpg",
+      imageContentType: "image/jpeg", status: "DRAFT",
+      participants: { create: ["me", "a", "b", "c"].map((p) => ({ id: `summary-picks-${p}`, displayName: p })) },
+    } });
+    await prisma.receipt.update({ where: { id }, data: { organizerParticipantId: "summary-picks-me" } });
+    expect(await read()).toBeNull();
+    await prisma.receipt.update({ where: { id }, data: { picksOpenedAt: new Date() } });
+    await prisma.participant.updateMany({
+      where: { id: { in: ["summary-picks-me", "summary-picks-a", "summary-picks-b"] } },
+      data: { picksSubmittedAt: new Date() },
+    });
+    expect(await read()).toEqual({ open: true, done: 2, total: 3 });
+    await prisma.receipt.update({ where: { id }, data: { picksOpenedAt: null } });
+    expect(await read()).toEqual({ open: false, done: 2, total: 3 });
   });
 
   it("excludes soft-deleted receipts", async () => {

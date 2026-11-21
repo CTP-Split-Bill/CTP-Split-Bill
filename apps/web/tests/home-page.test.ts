@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
 }));
 vi.mock("@project/auth", () => ({ currentUserId: mocks.currentUserId }));
 vi.mock("@project/domain", () => ({ listReceiptSummaries: mocks.listReceiptSummaries }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh() {} }) }));
 
 const { default: Home } = await import("../app/page");
 
@@ -42,7 +43,7 @@ describe("home page", () => {
     mocks.currentUserId.mockResolvedValue("u1");
     mocks.listReceiptSummaries.mockResolvedValue([
       { id: "r 1", status: "DRAFT", merchantName: "Noodle Bar", title: null, total: "12.50",
-        createdAt: "2026-11-02T00:00:00.000Z", payerName: null, participantCount: 2, settled: null },
+        createdAt: "2026-11-02T00:00:00.000Z", payerName: null, participantCount: 2, settled: null, unpaidCount: null },
     ]);
     const page = (await Home()) as ReactElement<{ children: ReactElement[] }>;
     const list = (page.props.children[1] as ReactElement<{ children: ReactElement<{ userId: string }> }>).props.children;
