@@ -62,6 +62,7 @@ Every feature template section is required. See ../../CONTRIBUTING.md.
 | [guest picks](receipts/guest-picks.md) | Per-participant guest links: item picks and done status before finalize, everyone's amounts after (ADR-0015) |
 | [picks screen](bills/split-screen.md) | Live picks board while picking is open; pause to assign or share any item, then reopen |
 | [totals check](receipts/totals-check.md) | Detail reports item/amount differences; mismatches still cannot finalize |
+| [finalize screen](receipts/finalize-screen.md) | Final per-person amounts, the totals check, and pausing picking to finalize |
 
 Party specifications and APIs are retired. Historical SQL remains append-only.
 

@@ -29,7 +29,8 @@ stray tap.
   `AlertDialog` and the request errors.
 - packages/domain/src/totals.ts and receipt.ts: the `totals` object on
   receipt detail, as receipts/totals-check.md describes.
-- packages/db/src/seed.ts: one reviewed, mismatched draft receipt for the
+- packages/db/src/seed-examples.ts (`pnpm db:seed:examples`): one reviewed,
+  mismatched draft receipt (Taco Stand) in the signed-in account, for the
   drill.
 - apps/web/tests/finalize-screen.test.ts.
 - Writes go through the existing routes: POST
@@ -148,9 +149,9 @@ stray tap.
 - pnpm typecheck and pnpm build pass.
 - Drill (pnpm dev, signed in): finish a seeded receipt through Picks, open
   picking, press Pause picking and finalize, confirm; the bills list shows
-  its bills. Then open the seeded mismatched receipt (packages/db/src/seed.ts
-  adds a reviewed receipt whose items are 2.50 short of its subtotal, since
-  the editor can't produce one); it shows the alert and a disabled button.
+  its bills. Then run `pnpm db:seed:examples` and open Taco Stand (a reviewed
+  receipt whose items are 2.50 short of its subtotal, since the editor can't
+  produce one); its Finalize step shows the alert and a disabled button.
 - Phone pass at 375px from web.md, and a keyboard-only pass through opening,
   cancelling and confirming the dialog.
 

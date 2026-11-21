@@ -2,7 +2,7 @@
 // The finalize button, the pause-then-confirm flow and the confirmation dialog.
 // Spec: docs/specs/receipts/finalize-screen.md, "Finalizing".
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -62,6 +62,9 @@ export function FinalizePanel({ receiptId, revision, pickingOpen, disabledReason
   const [openAfterRefresh, setOpenAfterRefresh] = useState(false);
   const [refreshing, startRefresh] = useTransition();
   const base = `/api/receipts/${encodeURIComponent(receiptId)}`;
+  // The dialog opens from state, not a Trigger, so Radix has nothing to return
+  // focus to on close; send it back to the Finalize button.
+  const finalizeButton = useRef<HTMLButtonElement>(null);
 
   // After pausing, open the confirmation only once the refreshed amounts are in.
   useEffect(() => {
@@ -121,6 +124,7 @@ export function FinalizePanel({ receiptId, revision, pickingOpen, disabledReason
       )}
       <div className="flex flex-col items-stretch gap-1 sm:items-end">
         <Button
+          ref={finalizeButton}
           type="button"
           className="min-h-11 sm:min-w-40"
           onClick={start}
@@ -137,7 +141,13 @@ export function FinalizePanel({ receiptId, revision, pickingOpen, disabledReason
       </div>
 
       <AlertDialog open={open} onOpenChange={(next) => !busy && setOpen(next)}>
-        <AlertDialogContent onEscapeKeyDown={(e) => busy && e.preventDefault()}>
+        <AlertDialogContent
+          onEscapeKeyDown={(e) => busy && e.preventDefault()}
+          onCloseAutoFocus={(e) => {
+            e.preventDefault();
+            finalizeButton.current?.focus();
+          }}
+        >
           <AlertDialogHeader>
             <AlertDialogTitle>Finalize this receipt?</AlertDialogTitle>
             <AlertDialogDescription>{confirmationText(billCount, total)}</AlertDialogDescription>

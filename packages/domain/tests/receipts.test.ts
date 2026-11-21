@@ -2,22 +2,34 @@
 import { describe, expect, it } from "vitest";
 import { prisma } from "@project/db";
 import { seedDemo } from "../../db/src/seed";
+import { seedExamples } from "../../db/src/seed-examples";
 import { finalizeReceipt, getReceipt, listReceiptBills, listReceipts, updateReceipt } from "../src";
+
+describe("example receipts", () => {
+  it("gives the signed-in account a reviewed draft that is 2.50 short, for the finalize mismatch drill", async () => {
+    const user = await prisma.user.create({ data: { name: "Example owner", email: "examples@example.com" } });
+    await seedExamples("examples@example.com");
+    await seedExamples("examples@example.com");
+    const id = `example-${user.id}-taco-stand`;
+    const mismatch = await getReceipt(user.id, id);
+    expect(mismatch.status).toBe("DRAFT");
+    expect(mismatch.reviewedAt).not.toBeNull();
+    expect(mismatch.organizerParticipantId).toBe(`${id}-me`);
+    expect(mismatch.participants).toHaveLength(2);
+    expect(mismatch.totals).toEqual({
+      itemsTotal: "61.50", itemsDifference: "2.50", amountsDifference: "0.00", reconciled: false,
+    });
+    const stranger = await prisma.user.create({ data: { name: "Stranger", email: "stranger@example.com" } });
+    await expect(getReceipt(stranger.id, id)).rejects.toMatchObject({ status: 404 });
+  });
+});
 
 describe("receipt-owned seed drill", () => {
   it("seeds idempotently, scopes history, confirms and finalizes the demo receipt", async () => {
     await seedDemo();
     await seedDemo();
     expect(await prisma.participant.count({ where: { receiptId: "seed-receipt-demo" } })).toBe(2);
-    expect((await listReceipts("demo-user")).map((receipt) => receipt.id).sort())
-      .toEqual(["seed-receipt-demo", "seed-receipt-mismatch"]);
-    // The finalize screen's mismatch drill: reviewed, yet 2.50 short.
-    const mismatch = await getReceipt("demo-user", "seed-receipt-mismatch");
-    expect(mismatch.reviewedAt).not.toBeNull();
-    expect(mismatch.organizerParticipantId).toBe("seed-mismatch-organizer");
-    expect(mismatch.totals).toEqual({
-      itemsTotal: "61.50", itemsDifference: "2.50", amountsDifference: "0.00", reconciled: false,
-    });
+    expect((await listReceipts("demo-user")).map((receipt) => receipt.id)).toEqual(["seed-receipt-demo"]);
     await expect(getReceipt("other-user", "seed-receipt-demo")).rejects.toMatchObject({ status: 404 });
     await expect(getReceipt("demo-user", undefined as unknown as string)).rejects.toMatchObject({ status: 404 });
     const receipt = await getReceipt("demo-user", "seed-receipt-demo");

@@ -27,7 +27,7 @@ mis-tap.
   toast.
 - apps/web/app/components/BillRow.tsx: one receipt row (presentational).
 - packages/db/src/seed-examples.ts (`pnpm db:seed:examples`): example
-  finalized receipts for a signed-in account, for local review.
+  receipts for a signed-in account, for local review.
 - apps/web/tests/receipt-summaries-route.test.ts,
   apps/web/tests/components.test.ts, apps/web/tests/bill-list.test.ts and
   apps/web/tests/home-page.test.ts.
@@ -227,7 +227,8 @@ mis-tap.
 - Run `pnpm typecheck` and `pnpm build`.
 - Every section can be seen locally: `pnpm db:seed:examples` (dev running,
   signed in once) adds Taco Night (waiting on payment, 2 still owe $48.20),
-  Brunch Club (settled) and Coffee Run (finalized, no bills) to the most
+  Brunch Club (settled), Coffee Run (finalized, no bills) and Taco Stand (a
+  draft, In progress) to the most
   recently created account, or to the account whose email is passed.
   Rerunning restores them.
 - Drill (`pnpm dev`, signed in): delete a receipt, then Undo; it returns to
