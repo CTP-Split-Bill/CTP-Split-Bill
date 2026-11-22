@@ -113,8 +113,9 @@ describe("PATCH /api/bills/:billsId", () => {
     // Alex's bill on the same receipt was not touched.
     expect((await stored("paid-bill-alex")).paidAt).toBeNull();
 
-    // The payments page is told to refresh.
-    expect(cache.revalidatePath).toHaveBeenCalledWith(`/receipts/${receiptId}/payments`);
+    // The finalize screen and the home list are told to refresh.
+    expect(cache.revalidatePath).toHaveBeenCalledWith(`/receipts/${receiptId}/finalize`);
+    expect(cache.revalidatePath).toHaveBeenCalledWith("/");
   });
 
   it("keeps the original paidAt when marked paid twice", async () => {

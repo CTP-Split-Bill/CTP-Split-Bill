@@ -43,12 +43,15 @@ subtotal, discount, tax, tip and total match the corrected restaurant receipt.
   largest remainder, then joinedAt and id, among shares that fit their remaining
   capacity. Every column and the final total reconcile exactly. Zero-subtotal
   participants receive zero tax, tip and discount.
-- One transaction creates one Bill per participant, marks FINALIZED and records
-  finalizedAt. Any insertion/status failure restores the draft and revision.
+- One transaction creates one Bill per participant, marks FINALIZED, records
+  finalizedAt, and sets the payer to the organizer when no payer is set. Any insertion/status failure restores the draft and revision.
 - Repeated or competing finalization produces one success and a 409, with no
   duplicate bills. Competing edits use the same revision lock.
 - Success returns receipt detail and revalidates receipt and bill-list paths.
 - The payer also receives a bill for reconciliation and counts as settled.
+  No screen chooses a payer yet, so on a receipt made in the app the
+  organizer is the payer and their own bill is never owed to themselves. A
+  payer that is already set is kept.
 
 ## Examples
 
@@ -69,6 +72,9 @@ subtotal, discount, tax, tip and total match the corrected restaurant receipt.
   review/state guards, insert/status rollback and concurrent writes.
 - The isolated seed drill confirms/finalizes the seeded receipt and checks its
   bill sum is 38.66. It rejects other-user and repeated finalization.
+- receipts.test.ts checks that finalizing with no payer makes the organizer
+  the payer (their bill settled), keeps a chosen payer, and that the
+  backfill migration settles the organizer's bill on an older receipt.
 - pnpm typecheck and pnpm build pass.
 
 ## Constraints & decisions

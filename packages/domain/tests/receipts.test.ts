@@ -1,4 +1,5 @@
 // Receipt ownership and the executable seed/finalize drill against PGlite.
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { prisma } from "@project/db";
 import { seedDemo } from "../../db/src/seed";
@@ -53,5 +54,57 @@ describe("receipt-owned seed drill", () => {
   it("rejects unknown users for both receipt history and details", async () => {
     await expect(listReceipts("missing-user")).rejects.toMatchObject({ status: 401 });
     await expect(getReceipt("missing-user", "seed-receipt-demo")).rejects.toMatchObject({ status: 401 });
+  });
+});
+
+describe("default payer", () => {
+  // A reviewed EVEN receipt with an organizer and a guest; payer as given.
+  async function draft(id: string, paidBy: "me" | "guest" | null) {
+    const owner = await prisma.user.create({ data: { name: `Owner ${id}`, email: `${id}@example.com` } });
+    await prisma.receipt.create({
+      data: {
+        id, ownerId: owner.id, title: "Lunch", imageBlobName: `seed/${id}.jpg`, imageContentType: "image/jpeg",
+        parseStatus: "SUCCEEDED", subtotal: "20.00", tax: "0.00", tip: "0.00", total: "20.00",
+        items: { create: [{ lineNumber: 1, name: "Pizza", quantity: "1", unitPrice: "20.00", totalPrice: "20.00" }] },
+        participants: { create: [{ id: `${id}-me`, displayName: "Alex" }, { id: `${id}-guest`, displayName: "Sam" }] },
+      },
+    });
+    await prisma.receipt.update({
+      where: { id },
+      data: { organizerParticipantId: `${id}-me`, paidByParticipantId: paidBy && `${id}-${paidBy}` },
+    });
+    const receipt = await getReceipt(owner.id, id);
+    const reviewed = await updateReceipt(owner.id, id, { expectedRevision: receipt.revision, reviewConfirmed: true });
+    return { owner: owner.id, revision: reviewed.revision };
+  }
+
+  it("makes the organizer the payer when none is chosen, so their own bill is settled", async () => {
+    const { owner, revision } = await draft("payer-default", null);
+    const finalized = await finalizeReceipt(owner, "payer-default", { expectedRevision: revision });
+    expect(finalized.paidByParticipantId).toBe("payer-default-me");
+    const bills = await listReceiptBills(owner, "payer-default");
+    // Both joined together, so bills tie-break by id: Sam (…-guest) first.
+    expect(bills.map((b) => [b.displayName, b.settled, b.outstandingAmount])).toEqual([
+      ["Sam", false, "10.00"], ["Alex", true, "0.00"],
+    ]);
+  });
+
+  it("keeps a payer that was chosen", async () => {
+    const { owner, revision } = await draft("payer-guest", "guest");
+    const finalized = await finalizeReceipt(owner, "payer-guest", { expectedRevision: revision });
+    expect(finalized.paidByParticipantId).toBe("payer-guest-guest");
+  });
+
+  it("backfills receipts finalized without a payer (migration 0008)", async () => {
+    const { owner, revision } = await draft("payer-backfill", null);
+    await finalizeReceipt(owner, "payer-backfill", { expectedRevision: revision });
+    // Recreate the old state: finalized with no payer.
+    await prisma.receipt.update({ where: { id: "payer-backfill" }, data: { paidByParticipantId: null } });
+    const before = await listReceiptBills(owner, "payer-backfill");
+    expect(before.map((b) => b.settled)).toEqual([false, false]);
+    const sql = readFileSync(new URL("../../db/prisma/migrations/0008_default_payer.sql", import.meta.url), "utf8");
+    await prisma.$executeRawUnsafe(sql.replace(/^\s*(BEGIN|COMMIT);\s*$/gm, "").replace(/--.*$/gm, ""));
+    const after = await listReceiptBills(owner, "payer-backfill");
+    expect(after.map((b) => [b.displayName, b.settled])).toEqual([["Sam", false], ["Alex", true]]);
   });
 });

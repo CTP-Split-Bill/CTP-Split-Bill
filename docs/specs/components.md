@@ -25,7 +25,7 @@ query plan or a currency decision into whatever screen renders it next.
   `TableCell`), `checkbox.tsx` (`Checkbox`), and `toggle-group.tsx`
   (`ToggleGroup`, `ToggleGroupItem`).
 - `apps/web/app/components/` (outside `ui/`) — **layer 2**, domain
-  components: `BillRow.tsx`, `UserMenu.tsx`, and the async-state blocks
+  components: `BillRow.tsx`, `UserMenu.tsx`, `PersonAvatar.tsx`, and the async-state blocks
   `LoadingState.tsx`, `EmptyState.tsx` and `ErrorState.tsx`.
 - `apps/web/app/lib/cn.ts` — `cn()`, the `clsx` + `tailwind-merge` helper
   layer-1 files merge `className` through.
@@ -276,6 +276,22 @@ row link and, in Edit mode, adds the Delete button beside it. It does not decide
 or who may see one. That scoping is [the bills list screen](bills/list-screen.md), and the loading,
 empty, and error states around the list are the async-honesty standard in
 [web](web.md) — owned by the screen, not by the row.
+
+### `PersonAvatar`
+
+`PersonAvatar` is a person's colored initial, drawn the same wherever people
+appear (the Picks screen, the guest pick page, the finalize screen). It takes
+`initial` and `color`, the person's 1-based roster position, which picks the
+`--color-person-N` fill and wraps past the palette. The initial is
+`--color-person-ink` on any fill.
+
+| Prop | Default | Effect |
+|---|---|---|
+| `size` | `"sm"` | `sm` is 28px beside a name or on an item; `lg` is 48px in the Picks people bar |
+| `label` | none | given, the avatar is `role="img"` with that accessible name and a tooltip; absent, it is `aria-hidden` because the name beside it is the label |
+| `outlined` | false | a surface-colored ring, for avatars that overlap in a stack |
+
+A screen decides the roster order and the initial; the avatar only draws them.
 
 ## Boundaries
 

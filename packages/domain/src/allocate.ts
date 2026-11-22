@@ -264,3 +264,44 @@ export function boardTotals(receipt: BoardSplitReceipt): BoardTotals {
     rows: members.map((m) => ({ participantId: m.id, itemsCents: rounded[index.get(m.id)!], amountOwed: null })),
   };
 }
+
+// ---- Each person's items, for the finalize screen (receipts/finalize-screen.md) ----
+
+export type PersonItem = {
+  name: string;
+  // How many people shared the item; 1 is the person's own.
+  ways: number;
+  // The person's part of the item, in cents.
+  shareCents: bigint;
+};
+
+// For each person, the items they had and their part of each, rounded so a
+// person's parts add up exactly to their Items amount (`subtotals`, from the
+// preview or the stored bills). Shared items split equally. EVEN receipts
+// list no items. A person whose Items amount the items can't round to (only
+// stale data) gets each part rounded on its own.
+export function personItems(
+  splitMode: string,
+  items: { name: string; totalPrice: bigint; people: string[] }[],
+  subtotals: Map<string, bigint>,
+): Map<string, PersonItem[]> {
+  const result = new Map<string, PersonItem[]>();
+  for (const [personId, subtotal] of subtotals) {
+    if (splitMode === "EVEN") {
+      result.set(personId, []);
+      continue;
+    }
+    const mine = items
+      .map((item) => ({ item, ways: new Set(item.people).size }))
+      .filter(({ item }) => item.people.includes(personId));
+    const exact = mine.map(({ item, ways }) => fraction(item.totalPrice, BigInt(ways)));
+    let shares: bigint[];
+    try {
+      shares = mine.length ? roundColumn(subtotal, exact) : [];
+    } catch {
+      shares = exact.map((value) => (value.numerator * 2n + value.denominator) / (value.denominator * 2n));
+    }
+    result.set(personId, mine.map(({ item, ways }, index) => ({ name: item.name, ways, shareCents: shares[index] })));
+  }
+  return result;
+}

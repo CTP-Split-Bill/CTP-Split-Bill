@@ -1,7 +1,7 @@
 // boardTotals (docs/specs/bills/split-screen.md, "Running totals"): owed
 // amounts once covered, items so far otherwise, and the sums always balance.
 import { describe, expect, it } from "vitest";
-import { boardTotals, type BoardSplitReceipt } from "../src/allocate";
+import { boardTotals, personItems, type BoardSplitReceipt } from "../src/allocate";
 
 const participants = ["a", "b", "c"].map((id, i) => ({ id, joinedAt: new Date(i * 1000) }));
 const base: BoardSplitReceipt = {
@@ -63,5 +63,38 @@ describe("boardTotals", () => {
       expect(rows + t.unclaimedCents).toBe(cents);
       if (t.owed) expect(t.rows.reduce((sum, r) => sum + r.amountOwed!, 0n)).toBe(cents + 266n + 600n);
     }
+  });
+});
+
+describe("personItems", () => {
+  const items = [
+    { name: "Salmon", totalPrice: 1600n, people: ["a"] },
+    { name: "Edamame", totalPrice: 1000n, people: ["a", "b", "c"] },
+    { name: "Miso", totalPrice: 400n, people: ["b"] },
+  ];
+
+  it("lists each person's items with their share, adding up exactly to their Items amount", () => {
+    // 10.00 three ways: the allocator gives a the extra cent in the subtotal column.
+    const shares = personItems("ITEMIZED", items, new Map([["a", 1934n], ["b", 733n], ["c", 333n]]));
+    expect(shares.get("a")).toEqual([
+      { name: "Salmon", ways: 1, shareCents: 1600n },
+      { name: "Edamame", ways: 3, shareCents: 334n },
+    ]);
+    expect(shares.get("b")).toEqual([
+      { name: "Edamame", ways: 3, shareCents: 333n },
+      { name: "Miso", ways: 1, shareCents: 400n },
+    ]);
+    for (const [id, total] of [["a", 1934n], ["b", 733n], ["c", 333n]] as const) {
+      expect(shares.get(id)!.reduce((sum, item) => sum + item.shareCents, 0n)).toBe(total);
+    }
+  });
+
+  it("lists nothing for EVEN, and nothing for someone with no items", () => {
+    expect(personItems("EVEN", items, new Map([["a", 1000n]])).get("a")).toEqual([]);
+    expect(personItems("ITEMIZED", items, new Map([["d", 0n]])).get("d")).toEqual([]);
+  });
+
+  it("rounds each part on its own when the Items amount can't be reached", () => {
+    expect(personItems("ITEMIZED", items, new Map([["c", 9999n]])).get("c")).toEqual([{ name: "Edamame", ways: 3, shareCents: 333n }]);
   });
 });

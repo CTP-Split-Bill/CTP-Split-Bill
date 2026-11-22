@@ -9,7 +9,7 @@ import { Alert, AlertDescription, AlertTitle } from "../../../components/ui/aler
 import { formatDate } from "../../../lib/format";
 import { type ReceiptDetail, loadStep, stepPath } from "../step-guard";
 import { FinalizePanel } from "./FinalizePanel";
-import { SummaryTable } from "./SummaryTable";
+import { BackToReceipts, WhoOwes } from "./WhoOwes";
 import { buildSummary, mismatchMessages } from "./summary";
 
 export const dynamic = "force-dynamic";
@@ -43,7 +43,12 @@ async function FinalizeSummary({ receiptId }: { receiptId: string }) {
 
   if (receipt.status === "FINALIZED") {
     const bills = await listReceiptBills(userId, receipt.id);
-    return <SummaryTable summary={buildSummary(bills, receipt.participants, receipt.currency, null)} />;
+    return (
+      <div className="space-y-6">
+        <WhoOwes summary={buildSummary(bills, receipt, true)} />
+        <BackToReceipts />
+      </div>
+    );
   }
 
   if (!receipt.totals.reconciled) {
@@ -57,16 +62,26 @@ async function FinalizeSummary({ receiptId }: { receiptId: string }) {
     if (e instanceof ApiError && e.status === 400) {
       return <Mismatch receipt={receipt} messages={[e.message]} />;
     }
+    if (e instanceof ApiError && e.status === 409) {
+      return (
+        <FinalizePanel
+          receiptId={receipt.id}
+          revision={receipt.revision}
+          pickingOpen={receipt.picksOpenedAt !== null}
+          disabledReason="Reload to see the latest amounts"
+          billCount={0}
+          total=""
+          initialError={{ message: e.message, conflict: true }}
+        />
+      );
+    }
     throw e;
   }
 
-  const summary = buildSummary(preview.allocations, receipt.participants, receipt.currency, {
-    splitMode: receipt.splitMode,
-    organizerParticipantId: receipt.organizerParticipantId,
-  });
+  const summary = buildSummary(preview.allocations, receipt, false);
   return (
     <div className="space-y-6">
-      <SummaryTable summary={summary} />
+      <WhoOwes summary={summary} />
       <FinalizePanel
         receiptId={receipt.id}
         revision={preview.revision}

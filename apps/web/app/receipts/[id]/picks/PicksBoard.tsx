@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { Badge } from "../../../components/ui/badge";
 import { Button } from "../../../components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "../../../components/ui/toggle-group";
+import { PersonAvatar } from "../../../components/PersonAvatar";
 import { cn } from "../../../lib/cn";
 import { installLinkGuard } from "../../../lib/link-guard";
 import { loginPath } from "../../../lib/page-access";
@@ -416,10 +417,6 @@ export function PicksBoard({ initial }: { initial: BoardReceipt }) {
   );
 }
 
-// Static class names, so Tailwind generates each fill.
-const FILLS = ["bg-person-1", "bg-person-2", "bg-person-3", "bg-person-4", "bg-person-5", "bg-person-6"];
-const fill = (color: number) => FILLS[(color - 1) % FILLS.length];
-
 function PeopleBar({
   people,
   selectedId,
@@ -445,16 +442,8 @@ function PeopleBar({
             aria-label={person.done ? `${person.name}, done` : person.name}
             className="group h-auto w-16 flex-col gap-1 rounded-md px-0 py-1 text-ink data-[state=on]:bg-transparent data-[state=on]:text-ink"
           >
-            <span className="relative">
-              <span
-                aria-hidden="true"
-                className={cn(
-                  "flex size-12 items-center justify-center rounded-full text-lg font-semibold text-person-ink ring-offset-2 ring-offset-canvas group-data-[state=on]:ring-2 group-data-[state=on]:ring-ink",
-                  fill(person.color),
-                )}
-              >
-                {person.initial}
-              </span>
+            <span className="relative flex rounded-full ring-offset-2 ring-offset-canvas group-data-[state=on]:ring-2 group-data-[state=on]:ring-ink">
+              <PersonAvatar initial={person.initial} color={person.color} size="lg" />
               {person.done && (
                 <span aria-hidden="true" className="absolute -right-0.5 -bottom-0.5 flex size-5 items-center justify-center rounded-full border-2 border-canvas bg-brand text-brand-ink">
                   <CheckIcon className="size-3" strokeWidth={3} />
@@ -472,16 +461,7 @@ function PeopleBar({
 }
 
 function MiniAvatar({ avatar }: { avatar: Avatar }) {
-  return (
-    <span
-      role="img"
-      aria-label={avatar.label}
-      title={avatar.label}
-      className={cn("flex size-7 items-center justify-center rounded-full text-xs font-semibold text-person-ink", fill(avatar.color))}
-    >
-      <span aria-hidden="true">{avatar.initial}</span>
-    </span>
-  );
+  return <PersonAvatar initial={avatar.initial} color={avatar.color} label={avatar.label} />;
 }
 
 function ItemCard({

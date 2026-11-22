@@ -185,6 +185,7 @@ const allocationReceipt = {
   tip: true,
   total: true,
   paidByParticipantId: true,
+  organizerParticipantId: true,
   reviewedAt: true,
   participants: { select: { id: true, joinedAt: true } },
   items: {
@@ -296,7 +297,13 @@ export async function finalizeReceipt(
     });
     return presentReceipt(await tx.receipt.update({
       where: { ...scope, status: "DRAFT" },
-      data: { status: "FINALIZED", finalizedAt: new Date() },
+      // No screen chooses a payer yet, so the organizer fronted the bill:
+      // their own share is settled, not owed to themselves.
+      data: {
+        status: "FINALIZED",
+        finalizedAt: new Date(),
+        paidByParticipantId: receipt.paidByParticipantId ?? receipt.organizerParticipantId,
+      },
       select: receiptDetail,
     }));
   });

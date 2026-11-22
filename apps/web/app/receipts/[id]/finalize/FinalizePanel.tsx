@@ -27,9 +27,11 @@ export type FinalizePanelProps = {
   disabledReason: string | null;
   billCount: number;
   total: string;
+  // An error the page already hit, such as a 409 from the preview.
+  initialError?: RequestError;
 };
 
-type RequestError = { message: string; conflict: boolean };
+export type RequestError = { message: string; conflict: boolean };
 
 async function requestError(res: Response): Promise<RequestError> {
   let message = "Something went wrong. Try again.";
@@ -54,11 +56,15 @@ async function post(url: string, body: unknown): Promise<Response | null> {
   }
 }
 
-export function FinalizePanel({ receiptId, revision, pickingOpen, disabledReason, billCount, total }: FinalizePanelProps) {
+export function FinalizePanel({
+  receiptId, revision, pickingOpen, disabledReason, billCount, total, initialError,
+}: FinalizePanelProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<RequestError | null>(null);
+  const [requestErr, setError] = useState<RequestError | null>(null);
+  // The page's own error stays until a refresh renders without it.
+  const error = requestErr ?? initialError ?? null;
   const [openAfterRefresh, setOpenAfterRefresh] = useState(false);
   const [refreshing, startRefresh] = useTransition();
   const base = `/api/receipts/${encodeURIComponent(receiptId)}`;
