@@ -44,6 +44,8 @@ each person owes without administering a reusable party or guest accounts.
   require separate corrected lines preserving the receipt subtotal.
 - Finalization reuses the calculator, creates one Bill per participant, and
   writes FINALIZED/finalizedAt in the same transaction. All four sums reconcile.
+  The same transaction defaults a missing payer to the organizer. Receipts
+  finalized before that default are backfilled the same way by a migration.
 - Bill amounts are immutable. paidAt records manual payment tracking. The payer
   and zero-owed bills also count as settled; outstanding is zero when settled,
   otherwise amountOwed. There is no active Payment ledger.
