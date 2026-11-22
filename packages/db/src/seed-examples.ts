@@ -1,5 +1,6 @@
-// Example finalized receipts for a signed-in organizer, so every home-list
-// section (Waiting on payment, Settled) has something to show in local dev.
+// Example receipts for a signed-in organizer, so every home-list section
+// (Waiting on payment, Settled) has something to show in local dev, plus one
+// draft that doesn't add up for the finalize screen's mismatch drill.
 // Idempotent: rerunning restores the examples (undeletes them, resets who
 // has paid) without duplicating anything.
 //
@@ -89,7 +90,41 @@ export async function seedExamples(email?: string, db = prisma) {
       });
     }
   }
-  return { owner, count: EXAMPLES.length };
+  await seedMismatch(db, owner.id);
+  return { owner, count: EXAMPLES.length + 1 };
+}
+
+// Reviewed but $2.50 short: items add up to 61.50 against a 64.00 subtotal.
+// The Items screen can't save this, so the finalize screen's mismatch alert
+// (receipts/finalize-screen.md) is only reachable through a seeded receipt.
+async function seedMismatch(db: typeof prisma, ownerId: string) {
+  const receiptId = `example-${ownerId}-taco-stand`;
+  await db.receipt.upsert({
+    where: { id: receiptId },
+    update: { deletedAt: null },
+    create: {
+      id: receiptId, ownerId, title: "Taco Tuesday", merchantName: "Taco Stand",
+      imageBlobName: "examples/taco-stand.jpg", imageContentType: "image/jpeg",
+      parseStatus: "SUCCEEDED", reviewedAt: new Date("2026-11-12T01:00:00Z"),
+      createdAt: new Date("2026-11-12T01:00:00Z"),
+      subtotal: "64.00", tax: "5.68", tip: "11.52", total: "81.20",
+      items: { create: [
+        { lineNumber: 1, name: "Tacos", quantity: "3", unitPrice: "12.50", totalPrice: "37.50", isVerified: true },
+        { lineNumber: 2, name: "Nachos", quantity: "2", unitPrice: "12.00", totalPrice: "24.00", isVerified: true },
+      ] },
+    },
+  });
+  await db.participant.createMany({
+    data: [
+      { id: `${receiptId}-me`, receiptId, displayName: "You", joinedAt: new Date(0) },
+      { id: `${receiptId}-riley`, receiptId, displayName: "Riley", joinedAt: new Date(1000) },
+    ],
+    skipDuplicates: true,
+  });
+  await db.receipt.update({
+    where: { id: receiptId },
+    data: { organizerParticipantId: `${receiptId}-me`, paidByParticipantId: `${receiptId}-me` },
+  });
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
@@ -100,6 +135,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
       console.log("  Taco Night  — waiting on payment (2 still owe $48.20)");
       console.log("  Brunch Club — settled, all paid");
       console.log("  Coffee Run  — finalized, no bills");
+      console.log("  Taco Stand  — draft that's $2.50 short (finalize screen mismatch alert)");
     })
     .catch((error) => { console.error(error); process.exitCode = 1; })
     .finally(() => prisma.$disconnect());
