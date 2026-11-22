@@ -47,7 +47,7 @@ async function FinalizeSummary({ receiptId }: { receiptId: string }) {
   }
 
   if (!receipt.totals.reconciled) {
-    return <Mismatch receipt={receipt} messages={mismatchMessages(receipt.totals, receipt.currency)} />;
+    return <Mismatch receipt={receipt} messages={mismatchMessages(receipt.totals, receipt.currency, Number(receipt.discount ?? 0) > 0)} />;
   }
 
   let preview;

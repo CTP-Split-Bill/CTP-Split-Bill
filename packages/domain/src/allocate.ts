@@ -159,6 +159,8 @@ export function allocateSplit(input: SplitInput): MemberAllocation[] {
 export type BoardSplitReceipt = {
   splitMode: string;
   subtotal: string | null;
+  // The receipt-level discount; null or absent is none.
+  discount?: string | null;
   tax: string | null;
   tip: string | null;
   participants: { id: string; joinedAt: Date | string }[];
@@ -174,7 +176,7 @@ export type BoardTotals = {
   unclaimedCount: number;
   unclaimedCents: bigint;
   // In the order given. itemsCents is the person's items (shared items split
-  // to the cent); amountOwed adds tax and tip, and is null until `owed`.
+  // to the cent); amountOwed adds tax and tip less the discount share, and is null until `owed`.
   rows: { participantId: string; itemsCents: bigint; amountOwed: bigint | null }[];
 };
 
@@ -204,6 +206,7 @@ export function boardTotals(receipt: BoardSplitReceipt): BoardTotals {
       owed = allocateSplit({
         splitMode: even ? "EVEN" : "ITEMIZED",
         subtotal: toCents(receipt.subtotal ?? ""),
+        discount: receipt.discount == null ? 0n : toCents(receipt.discount),
         tax: toCents(receipt.tax ?? ""),
         tip: receipt.tip === null ? 0n : toCents(receipt.tip),
         members,

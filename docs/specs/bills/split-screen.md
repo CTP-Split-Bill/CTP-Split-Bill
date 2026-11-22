@@ -132,7 +132,8 @@ saves without a guest's pick undoing the fix (ADR-0017).
   editing), through `@project/domain/allocate`, and reach the components as
   formatted strings ("$27.06").
 - When every item is covered for the split mode (receipts/flow.md), each row
-  shows what the person owes: their items, plus tax and tip in proportion,
+  shows what the person owes: their items, less their share of any receipt
+  discount, plus tax and tip in proportion,
   rounded exactly as finalization does (bills/split-allocation.md). These
   amounts equal the preview route's for the same state. EVEN is always
   covered.

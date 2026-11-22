@@ -30,6 +30,7 @@ function board(overrides: Partial<BoardReceipt> = {}): BoardReceipt {
     pickingOpen: true,
     splitMode: "ITEMIZED",
     subtotal: "30",
+    discount: null,
     tax: "2.66",
     tip: "6",
     total: "38.66",
@@ -164,6 +165,12 @@ describe("running totals", () => {
     expect(view.totalsNote).toBeNull();
     expect(view.matchedTotal).toBe("$38.66");
     expect(view.claimSummary).toBe("Every item is claimed");
+  });
+
+  it("takes the receipt discount off, so the amounts still match the total and Finalize is offered", () => {
+    const view = form.boardView(withPeople(two({ discount: "3.00", total: "35.66" }), { salmon: ["me"], miso: ["sam"], edamame: ["me", "sam"] }));
+    expect(view.people.every((p) => p.amountLabel !== "Items so far")).toBe(true);
+    expect(view.matchedTotal).toBe("$35.66");
   });
 
   it("shows only items so far while anything is unclaimed, and they add up with the unclaimed amount", () => {

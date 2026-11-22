@@ -20,6 +20,12 @@ describe("boardTotals", () => {
     expect(t.rows.map((r) => r.amountOwed)).toEqual([2706n, 1160n, 0n]);
   });
 
+  it("takes the discount off what people owe, so the rows add up to the receipt total", () => {
+    const t = boardTotals({ ...base, discount: "3.00" });
+    expect(t.owed).toBe(true);
+    expect(t.rows.reduce((sum, r) => sum + r.amountOwed!, 0n)).toBe(3000n - 300n + 266n + 600n);
+  });
+
   it("returns only items so far while an item is unclaimed", () => {
     const t = boardTotals({ ...base, items: [{ ...base.items[0], people: [] }, ...base.items.slice(1)] });
     expect(t).toMatchObject({ owed: false, unclaimedCount: 1, unclaimedCents: 1600n });

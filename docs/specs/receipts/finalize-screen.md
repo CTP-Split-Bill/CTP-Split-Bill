@@ -56,11 +56,14 @@ stray tap.
 - The page heading is "Review and finalize".
 - A table titled "Who owes what" has one row per participant, in the
   preview's order (joinedAt, then id): name, Items (subtotal), Tax, Tip and
-  Owes. A last row, "Total", sums each column; Owes sums to the receipt
+  Owes. When the receipt has a discount, a Discount column after Items shows
+  each person's discount share as a negative amount, so each row adds across
+  to Owes. A last row, "Total", sums each column; Owes sums to the receipt
   total. Amounts are formatted in the receipt's currency.
 - Below `md:` each person is a stacked row: the name and Owes on the first
-  line, "Items $x · Tax $y · Tip $z" muted under it. The Total row shows
-  only the Owes sum.
+  line, "Items $x · Tax $y · Tip $z" muted under it ("Items $x · Discount
+  -$d · Tax $y · Tip $z" with a discount). The Total row shows only the Owes
+  sum.
 - Unless the split mode is EVEN, each row carries a readiness `Badge`, from
   the receipt detail's participants:
   - "Done picking": `picksSubmittedAt` is set.
@@ -82,6 +85,7 @@ stray tap.
     "The items are $2.50 over the subtotal."
   - "Subtotal, tax and tip are $1.00 short of the total." / "… over the
     total."
+    With a discount it reads "Subtotal, discount, tax and tip are …".
   - A null difference reads "Some item prices or amounts are missing."
 - The alert ends with a **Fix the items** link to `/receipts/[id]/items`.
   Finalize is disabled, with "Fix the totals first" under it.

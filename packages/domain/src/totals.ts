@@ -19,6 +19,7 @@ function signedMoney(value: bigint): string {
 
 export function receiptTotals(receipt: {
   subtotal: StoredMoney;
+  discount?: StoredMoney;
   tax: StoredMoney;
   tip: StoredMoney;
   total: StoredMoney;
@@ -32,11 +33,12 @@ export function receiptTotals(receipt: {
   const tax = cents(receipt.tax);
   const total = cents(receipt.total);
   const tip = cents(receipt.tip) ?? 0n;
+  const discount = cents(receipt.discount ?? null) ?? 0n;
 
   const itemsDifference = subtotal === null || itemsTotal === null ? null : subtotal - itemsTotal;
   const amountsDifference = subtotal === null || tax === null || total === null
     ? null
-    : total - (subtotal + tax + tip);
+    : total - (subtotal - discount + tax + tip);
 
   return {
     itemsTotal: itemsTotal === null ? null : signedMoney(itemsTotal),
