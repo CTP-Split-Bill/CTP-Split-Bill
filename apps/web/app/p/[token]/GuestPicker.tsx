@@ -7,6 +7,7 @@ import { Checkbox } from "../../components/ui/checkbox";
 import { EmptyState } from "../../components/EmptyState";
 import { ErrorState } from "../../components/ErrorState";
 import { LoadingState } from "../../components/LoadingState";
+import { PersonAvatar } from "../../components/PersonAvatar";
 import { installLeaveGuard } from "../../receipts/[id]/participants/leave-guard";
 import { PERSON_COLORS, initialOf } from "../../receipts/[id]/picks/picks-form";
 import { GuestPickSession } from "./guest-pick-session";
@@ -106,7 +107,6 @@ export function GuestPicker({ token, initial }: { token: string; initial: GuestV
   );
 }
 
-const FILLS = ["bg-person-1", "bg-person-2", "bg-person-3", "bg-person-4", "bg-person-5", "bg-person-6"];
 const SHOWN = 3;
 
 // Who else picked an item, as the organizer's picks board shows it. The names
@@ -116,10 +116,7 @@ function PickedBy({ ids, names, colors }: { ids: string[]; names: Map<string, st
   return (
     <span aria-hidden="true" className="flex shrink-0 -space-x-1.5">
       {ids.slice(0, extra > 0 ? SHOWN - 1 : SHOWN).map((id) => (
-        <span key={id} title={names.get(id)}
-          className={`flex size-7 items-center justify-center rounded-full text-xs font-semibold text-person-ink ring-2 ring-surface ${FILLS[(colors.get(id)! - 1) % FILLS.length]}`}>
-          {initialOf(names.get(id)!)}
-        </span>
+        <PersonAvatar key={id} initial={initialOf(names.get(id)!)} color={colors.get(id)!} label={names.get(id)!} outlined />
       ))}
       {extra > 0 && (
         <span className="flex size-7 items-center justify-center rounded-full bg-line text-xs font-semibold text-ink ring-2 ring-surface">

@@ -8,6 +8,7 @@ import { BillRow } from "../app/components/BillRow";
 import { EmptyState } from "../app/components/EmptyState";
 import { ErrorState } from "../app/components/ErrorState";
 import { LoadingState } from "../app/components/LoadingState";
+import { PersonAvatar } from "../app/components/PersonAvatar";
 import { UserMenu } from "../app/components/UserMenu";
 import RootError from "../app/error";
 
@@ -31,6 +32,19 @@ describe("Card", () => {
     expect(html).toContain("bg-card");
     expect(html).toContain("text-card-foreground");
     expect(html).not.toMatch(/class=""/);
+  });
+});
+
+describe("PersonAvatar", () => {
+  it("is decorative without a label, and a named image with one", () => {
+    const plain = renderToStaticMarkup(h(PersonAvatar, { initial: "M", color: 2 }));
+    expect(plain).toMatch(/^<span aria-hidden="true" class="[^"]*size-7[^"]*bg-person-2[^"]*">M<\/span>$/);
+    const named = renderToStaticMarkup(h(PersonAvatar, { initial: "M", color: 2, label: "Maya", size: "lg", outlined: true }));
+    expect(named).toMatch(/^<span role="img" aria-label="Maya" title="Maya" class="[^"]*size-12[^"]*ring-surface[^"]*bg-person-2[^"]*">/);
+  });
+
+  it("wraps colors past the palette", () => {
+    expect(renderToStaticMarkup(h(PersonAvatar, { initial: "G", color: 7 }))).toContain("bg-person-1");
   });
 });
 

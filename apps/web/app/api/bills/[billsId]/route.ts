@@ -1,5 +1,5 @@
 // GET /api/bills/:billsId - Return one organizer-owned participant bill and its breakdown.
-// Planned PATCH /api/bills/:billsId - Mark the bill paid or unpaid without changing its calculated amounts.
+// PATCH /api/bills/:billsId - Mark the bill paid or unpaid without changing its calculated amounts.
 
 import { currentUserId } from "@project/auth";
 import { getBill, toApiError, apiError, invalidInput, setBillPaid, SetBillPaid } from "@project/domain";
@@ -26,7 +26,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ billsI
     const parsed = SetBillPaid.safeParse(body);
     if (!parsed.success) return invalidInput(parsed.error);
     const bill = await setBillPaid(me, billsId, parsed.data);
-    revalidatePath(`/receipts/${bill.receiptId}/payments`);
+    // The finalize screen's cards and the home list both read settlement.
+    revalidatePath(`/receipts/${bill.receiptId}/finalize`);
+    revalidatePath("/");
     return Response.json(bill);
   } catch (e) {
     return toApiError(e);
