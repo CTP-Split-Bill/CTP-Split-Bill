@@ -23,6 +23,16 @@ describe("receiptTotals", () => {
     expect(totals).toMatchObject({ itemsDifference: "-1.10", amountsDifference: "-1.20", reconciled: false });
   });
 
+  it("takes the receipt discount off the subtotal in the amounts check", () => {
+    const discounted = { ...amounts, discount: "4.00", total: "77.20" };
+    expect(receiptTotals({ ...discounted, items: items("40.00", "24.00") })).toEqual({
+      itemsTotal: "64.00", itemsDifference: "0.00", amountsDifference: "0.00", reconciled: true,
+    });
+    expect(receiptTotals({ ...discounted, total: "81.20", items: items("64.00") })).toMatchObject({
+      amountsDifference: "4.00", reconciled: false,
+    });
+  });
+
   it("treats a null tip as zero", () => {
     const totals = receiptTotals({ subtotal: "10.00", tax: "1.00", tip: null, total: "11.00", items: items("10.00") });
     expect(totals).toMatchObject({ amountsDifference: "0.00", reconciled: true });

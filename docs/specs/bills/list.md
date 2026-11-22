@@ -24,7 +24,10 @@ remains unpaid, including their own share if they fronted the restaurant bill.
   Before finalization it returns [].
 - Individual GET takes a bill ID, not a receipt ID, and returns one object.
 - Bills include id, receiptId, participantId, displayName, phone, subtotal,
-  taxShare, tipShare, amountOwed, paidAt, createdAt, settled and outstandingAmount.
+  discountShare, taxShare, tipShare, amountOwed, paidAt, createdAt, settled and
+  outstandingAmount.
+- discountShare is the participant's allocated portion of Receipt.discount;
+  it is zero when the receipt discount is null or zero.
 - Money uses decimal strings with two places. Dates use ISO strings or null.
 - settled is true for paidAt, the receipt's original payer or zero amountOwed.
   Outstanding is zero when settled and amountOwed otherwise.

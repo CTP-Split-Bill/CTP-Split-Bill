@@ -54,7 +54,24 @@ describe("buildSummary", () => {
       ["Maya", "$20.00", "$1.80", "$4.00", "$25.80", "Done picking"],
       ["Sam", "$10.00", "$0.90", "$2.00", "$12.90", "Still picking"],
     ]);
-    expect(summary.totals).toEqual({ subtotal: "$30.00", tax: "$2.70", tip: "$6.00", owes: "$38.70" });
+    expect(summary.totals).toEqual({ subtotal: "$30.00", discount: "$0.00", tax: "$2.70", tip: "$6.00", owes: "$38.70" });
+    expect(summary.hasDiscount).toBe(false);
+  });
+
+  it("shows each person's discount share as a negative amount, so rows add across to Owes", () => {
+    const summary = buildSummary(
+      [
+        { participantId: "maya", subtotal: "20.00", discountShare: "2.00", taxShare: "1.80", tipShare: "4.00", amountOwed: "23.80" },
+        { participantId: "sam", subtotal: "10.00", discountShare: "1.00", taxShare: "0.90", tipShare: "2.00", amountOwed: "11.90" },
+      ],
+      people, "USD", null,
+    );
+    expect(summary.hasDiscount).toBe(true);
+    expect(summary.rows.map((r) => r.discount)).toEqual(["-$2.00", "-$1.00"]);
+    expect(summary.totals).toMatchObject({ discount: "-$3.00", owes: "$35.70" });
+    const html = renderToStaticMarkup(h(SummaryTable, { summary }));
+    expect(html).toMatch(/<th[^>]*>Discount<\/th>/);
+    expect(html).toContain("Items $20.00 · Discount -$2.00 · Tax $1.80 · Tip $4.00");
   });
 
   it("sums cents without float drift", () => {
@@ -77,6 +94,11 @@ describe("mismatch sentences", () => {
     expect(check("0.00", "-1.00")).toEqual(["Subtotal, tax and tip are $1.00 over the total."]);
   });
 
+  it("names the discount in the amounts sentence when the receipt has one", () => {
+    expect(mismatchMessages({ itemsDifference: "0.00", amountsDifference: "1.00", reconciled: false }, "USD", true))
+      .toEqual(["Subtotal, discount, tax and tip are $1.00 short of the total."]);
+  });
+
   it("says amounts are missing when a difference is null", () => {
     expect(check(null, "0.00")).toEqual(["Some item prices or amounts are missing."]);
     expect(check(null, null)).toEqual(["Some item prices or amounts are missing."]);
@@ -96,6 +118,7 @@ describe("static renders", () => {
       summary: buildSummary(even, people, "USD", { splitMode: "ITEMIZED", organizerParticipantId: "me" }),
     }));
     expect(html).toContain("Who owes what");
+    expect(html).not.toContain("Discount");
     expect(html).toContain("Done picking");
     expect(html).toContain("Still picking");
     expect(html).toContain("Total");

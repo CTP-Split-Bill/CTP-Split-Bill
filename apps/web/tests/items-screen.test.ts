@@ -22,6 +22,7 @@ function f(overrides: Partial<ReceiptForm> = {}): ReceiptForm {
     merchant: "Thai Place",
     date: "2026-11-02",
     subtotal: "20.00",
+    discount: "",
     tax: "1.80",
     tip: "3.20",
     total: "25.00",
@@ -123,7 +124,7 @@ describe("set subtotal / set total", () => {
     expect(form.setSubtotalTo(f({ subtotal: "", rows: [] }), form.totals(f({ subtotal: "", rows: [] })))).toBeNull();
   });
 
-  it("offers subtotal + tax + tip only while Total is empty", () => {
+  it("offers subtotal minus discount plus tax and tip only while Total is empty", () => {
     expect(form.setTotalTo(f({ total: "" }), form.totals(f({ total: "" })))).toBe("25.00");
     expect(form.setTotalTo(f({ total: "26.00" }), form.totals(f({ total: "26.00" })))).toBeNull();
     expect(form.setTotalTo(f({ total: "", tax: "" }), form.totals(f({ total: "", tax: "" })))).toBeNull();
@@ -237,6 +238,14 @@ describe("totals check", () => {
     expect(form.amountsCheckText(t.amountsDiff)).toBe("Matches");
   });
 
+  it("subtracts a receipt discount before comparing the total", () => {
+    const discounted = f({ discount: "3.00", total: "22.00" });
+    const t = form.totals(discounted);
+    expect(t).toMatchObject({ partsCents: 2200, amountsDiff: 0 });
+    expect(form.confirmProblems(discounted)).toEqual([]);
+    expect(form.formErrors(f({ discount: "20.01" })).fields.discount).toBe("Discount cannot exceed subtotal");
+  });
+
   it("says short or over by the exact amount", () => {
     expect(form.itemsCheckText(form.totals(f({ subtotal: "22.50" })).itemsDiff)).toBe("Items are $2.50 short of the subtotal");
     expect(form.itemsCheckText(form.totals(f({ subtotal: "19.00" })).itemsDiff)).toBe("Items are $1.00 over the subtotal");
@@ -244,10 +253,12 @@ describe("totals check", () => {
     expect(form.amountsCheckText(form.totals(f({ total: "24.99" })).amountsDiff)).toBe("$0.01 over the total");
   });
 
-  it("counts an empty tip as 0 and has no answer while a part is missing", () => {
+  it("counts empty tax, discount and tip as 0 in the live calculation", () => {
     expect(form.totals(f({ tip: "", total: "21.80" })).amountsDiff).toBe(0);
-    expect(form.totals(f({ tax: "" })).amountsDiff).toBeNull();
+    expect(form.totals(f({ tax: "", discount: "3.00", tip: "2.00", total: "" })))
+      .toMatchObject({ partsCents: 1900, amountsDiff: null });
     expect(form.totals(f({ rows: [row("a", "Pad Thai", "")] })).itemsCents).toBeNull();
+    expect(form.confirmProblems(f({ tax: "" }))[0]).toEqual({ message: MESSAGES.missingTotals, focusId: "receipt-tax" });
   });
 
   it("adds in cents, so 0.10 + 0.20 is exactly 0.30", () => {
@@ -417,6 +428,12 @@ describe("renders", () => {
     expect(html).not.toMatch(/>Price</);
   });
 
+  it("shows the live amount as soon as discount or tip is entered, before tax", () => {
+    const html = render({ subtotal: "20.00", discount: "3.00", tax: null, tip: "2.00", total: null });
+    expect(html).toContain("Subtotal − discount + tax + tip is");
+    expect(html).toContain("$19.00");
+  });
+
   it("describes the Line total input with the each hint for Qty other than 1", () => {
     const html = render({ items: [{ name: "Wings", quantity: "10", totalPrice: "24" }] });
     const hint = html.match(/<p id="([^"]+-each)"[^>]*>10 × \$2\.40 each<\/p>/);
@@ -542,7 +559,7 @@ describe("renders", () => {
     const html = render({ subtotal: null });
     const region = liveRegion(html);
     expect(region).toContain("Items add up to");
-    expect(region).toContain("Subtotal + tax + tip is");
+    expect(region).toContain("Subtotal − discount + tax + tip is");
     expect(region).not.toContain("Set subtotal to");
     expect(html).toContain(">Set subtotal to $14.00</button>");
   });

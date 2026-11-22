@@ -42,7 +42,7 @@ filling totals has to be quick, especially on a phone.
   couldn't read this one. Type the lines from the receipt, then confirm."
 - At the top: **Restaurant** (merchantName), first and full width, then
   **Date** (a date picker; purchasedAt).
-- Below the items: **Subtotal**, **Tax**, **Tip** and **Total**, as money
+- Below the items: **Subtotal**, **Discount**, **Tax**, **Tip** and **Total**, as money
   inputs (`inputmode="decimal"`, a `$` prefix). Money inputs, including
   Line total, have no placeholder, so an empty field never looks filled.
 - Money and quantities are right-aligned in tabular figures, in the inputs
@@ -58,7 +58,8 @@ filling totals has to be quick, especially on a phone.
   like 12.50"). A leading `$` and thousands commas are accepted as typed
   from a receipt ("$1,234.50"); a comma anywhere else is an error. What is
   saved is the plain amount ("1234.50"); the restaurant name is at most 200 characters. Messages show
-  under the field after it loses focus, and on Save for every field.
+  under the field after it loses focus, and on Save for every field. Discount
+  cannot exceed Subtotal when both are filled.
 - A chosen date is saved as noon UTC that day, so it shows the same date in
   every time zone.
 
@@ -111,17 +112,20 @@ filling totals has to be quick, especially on a phone.
 - A panel under the totals fields updates as the organizer types, computed
   in integer cents from the form (not from the last save):
   - **Items** add up to $X, compared with Subtotal.
-  - **Subtotal + tax + tip** (empty tip counts as 0), compared with Total.
+  - **Subtotal − discount + tax + tip**. Empty Discount, Tax and Tip count as
+    zero for the live calculation, so this amount updates as those fields are
+    entered; Tax is still required before confirmation.
   - At the right end of each line, a green check (✓) when it matches, or
     how far off it is followed by a red cross (✗), so the marks line up at
     the panel's edge: "Items are $2.50 short of the subtotal" / "over the
-    subtotal", or "$1.00 short of the total" / "$1.00 over the total". Nothing shows while a part
-    is missing. The icons are decorative; a screen reader hears "Matches" or
-    the short/over text.
+    subtotal", or "$1.00 short of the total" / "$1.00 over the total". The
+    amount comparison mark appears once Total is valid; the calculated amount
+    can show before Tax or Total is entered. The icons are decorative; a screen
+    reader hears "Matches" or the short/over text.
 - Below the results, while Subtotal is empty and there is at least one
   priced item, **Set subtotal to $64.00** (the items total) fills it; while
   Total is empty and Subtotal and Tax are filled, **Set total to $54.00**
-  (subtotal + tax + tip) fills it. Pressing one fills the field and moves
+  (subtotal − discount + tax + tip) fills it. Pressing one fills the field and moves
   focus to it. A filled Subtotal or Total is never offered for overwriting.
 - When the items don't match a filled Subtotal, the live result adds where
   to look: "The items are $2.50 short. A line may be missing or typed too
@@ -152,8 +156,9 @@ filling totals has to be quick, especially on a phone.
   checks must match (✓). If not, nothing is sent; the reasons show in an
   alert between the Items and Totals sections, so it stays in view when
   focus moves to Subtotal or Total ("Add at least one item", "Fill in the subtotal,
-  tax and total", "Items don't add up to the subtotal yet", "Subtotal + tax
-  + tip doesn't match the total yet", and "Fix the highlighted fields") and
+  tax and total", "Items don't add up to the subtotal yet", "Subtotal minus
+  discount plus tax and tip doesn't match the total yet", and "Fix the
+  highlighted fields") and
   focus moves to the first field with a problem. The server's check is still
   the authority; a 400 shows its message.
 - Both send the known revision. When the items changed, the items are sent
@@ -249,8 +254,8 @@ filling totals has to be quick, especially on a phone.
   filled, mismatched, picking-open and finalized states.
 - pnpm typecheck and pnpm build pass.
 - Drill (pnpm dev, signed in): on a receipt after a failed scan, type three
-  items with Enter, fill Subtotal with Set subtotal to $…, fill Tax, Tip and
-  Total, Confirm; People opens. Back on Items, edit a line total and reload
+  items with Enter, fill Subtotal with Set subtotal to $…, fill Discount, Tax,
+  Tip and Total, Confirm; People opens. Back on Items, edit a line total and reload
   without saving; the leave prompt shows. Edit it again and press the step
   bar's Back; the unsaved-changes toast shows, Discard leaves without
   saving, and Save and continue saves first. Save from a second, older tab;
@@ -308,7 +313,8 @@ filling totals has to be quick, especially on a phone.
 - Assigning or splitting items (the Picks step), finalizing (the Finalize
   step), and the payer and split mode.
 - Re-scanning, editing the photo, or showing the photo beside the form.
-- Discounts. Line totals are nonnegative (receipts/items.md) and the split
-  does not model discounts (bills/split-allocation.md), so a receipt with a
-  printed discount line cannot reconcile on this screen yet. A service fee
-  or other positive charge is entered as an ordinary item.
+- Item-level discounts are out of scope; the receipt-level discount is
+  subtracted after item subtotal and allocated proportionally at finalization
+  (bills/split-allocation.md). A future issue may add a discount field to each
+  receipt item. A service fee or other positive charge is entered as an
+  ordinary item.

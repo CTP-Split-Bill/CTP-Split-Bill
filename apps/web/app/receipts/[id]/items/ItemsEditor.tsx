@@ -338,8 +338,8 @@ export function ItemsEditor({ initial }: { initial: EditorReceipt }) {
 
         <section aria-labelledby="totals-heading" className="space-y-3">
           <h2 id="totals-heading" className="text-lg font-semibold">Totals</h2>
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-            {(["subtotal", "tax", "tip", "total"] as MoneyField[]).map((field) => (
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-5">
+            {(["subtotal", "discount", "tax", "tip", "total"] as MoneyField[]).map((field) => (
               <MoneyField
                 key={field}
                 id={fieldId(field)}
@@ -690,7 +690,7 @@ export function TotalsCheck({
         </div>
         <div className="flex items-start justify-between gap-3">
           <p>
-            <span className="text-ink-muted">Subtotal + tax + tip is </span>
+            <span className="text-ink-muted">Subtotal − discount + tax + tip is </span>
             <span className="font-semibold tabular-nums">{check.partsCents === null ? "—" : dollars(check.partsCents)}</span>
           </p>
           <CheckMark diff={check.amountsDiff} text={amounts} />

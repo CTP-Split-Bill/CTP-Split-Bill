@@ -2,7 +2,9 @@
 // rows, readiness labels, mismatch sentences and confirmation text. Pure, with
 // no database import, so it is unit-tested directly.
 
-export type Amounts = { subtotal: string; tax: string; tip: string; owes: string };
+// discount is the person's share of the receipt discount, formatted as a
+// negative amount ("-$2.50").
+export type Amounts = { subtotal: string; discount: string; tax: string; tip: string; owes: string };
 
 export type SummaryRow = Amounts & {
   participantId: string;
@@ -11,12 +13,15 @@ export type SummaryRow = Amounts & {
   readiness: string | null;
 };
 
-export type Summary = { rows: SummaryRow[]; totals: Amounts };
+// hasDiscount: the receipt has a discount, so the table shows its column.
+export type Summary = { rows: SummaryRow[]; totals: Amounts; hasDiscount: boolean };
 
 // One person's amounts as previewed or billed, two-decimal strings.
 export type Allocation = {
   participantId: string;
   subtotal: string;
+  // Absent on receipts without a discount.
+  discountShare?: string;
   taxShare: string;
   tipShare: string;
   amountOwed: string;
@@ -74,10 +79,13 @@ export function buildSummary(
   readiness: { splitMode: string; organizerParticipantId: string | null } | null,
 ): Summary {
   const byId = new Map(participants.map((p) => [p.id, p]));
-  const sums = { subtotal: 0n, tax: 0n, tip: 0n, owes: 0n };
+  const sums = { subtotal: 0n, discount: 0n, tax: 0n, tip: 0n, owes: 0n };
   const money = (value: string) => formatAmount(value, currency);
+  const negative = (value: bigint) => formatAmount(fromCents(-value), currency);
   const rows = allocations.map((a) => {
+    const discount = cents(a.discountShare ?? "0");
     sums.subtotal += cents(a.subtotal);
+    sums.discount += discount;
     sums.tax += cents(a.taxShare);
     sums.tip += cents(a.tipShare);
     sums.owes += cents(a.amountOwed);
@@ -86,6 +94,7 @@ export function buildSummary(
       participantId: a.participantId,
       name: participant?.displayName ?? "Unknown",
       subtotal: money(a.subtotal),
+      discount: negative(discount),
       tax: money(a.taxShare),
       tip: money(a.tipShare),
       owes: money(a.amountOwed),
@@ -99,16 +108,18 @@ export function buildSummary(
     rows,
     totals: {
       subtotal: money(fromCents(sums.subtotal)),
+      discount: negative(sums.discount),
       tax: money(fromCents(sums.tax)),
       tip: money(fromCents(sums.tip)),
       owes: money(fromCents(sums.owes)),
     },
+    hasDiscount: sums.discount !== 0n,
   };
 }
 
 // One sentence per thing that doesn't add up. Differences are signed:
-// itemsDifference is subtotal − items, amountsDifference is total − (subtotal + tax + tip).
-export function mismatchMessages(totals: TotalsCheck, currency: string): string[] {
+// itemsDifference is subtotal − items, amountsDifference is total − (subtotal − discount + tax + tip).
+export function mismatchMessages(totals: TotalsCheck, currency: string, discount = false): string[] {
   const messages: string[] = [];
   if (totals.itemsDifference === null || totals.amountsDifference === null) {
     messages.push("Some item prices or amounts are missing.");
@@ -121,7 +132,7 @@ export function mismatchMessages(totals: TotalsCheck, currency: string): string[
     messages.push(`${what} ${amount} ${value > 0n ? "short of" : "over"} the ${target}.`);
   };
   describe(totals.itemsDifference, "The items are", "subtotal");
-  describe(totals.amountsDifference, "Subtotal, tax and tip are", "total");
+  describe(totals.amountsDifference, discount ? "Subtotal, discount, tax and tip are" : "Subtotal, tax and tip are", "total");
   return messages;
 }
 

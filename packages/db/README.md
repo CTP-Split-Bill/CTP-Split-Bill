@@ -14,9 +14,10 @@ SharedItemAllocation and Bill. Receipts authorize their organizer directly.
 ## Migration format
 
 The loader reads flat .sql files in prisma/migrations, sorts filenames and
-records applied names in _migrations. Keep 0001_init.sql unchanged; the
-receipt remodel is 0002_receipt_remodel.sql. Do not introduce a second migration
-history or depend on nested migration.sql directories being discovered.
+records applied names in _migrations. Keep applied migrations unchanged; the
+receipt remodel is 0002_receipt_remodel.sql and later changes append numbered
+SQL files. Do not introduce a second migration history or depend on nested
+migration.sql directories being discovered.
 
 Fresh databases apply both migrations. Existing databases apply only pending
 ones. Tests apply the same files to memory:// PGlite.

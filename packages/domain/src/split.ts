@@ -1,5 +1,4 @@
-// The API-facing split: allocate.ts's arithmetic, with its input errors
-// reported as the standard 400 (bills/split-allocation.md).
+// API-facing wrapper around the shared split arithmetic.
 import {
   SplitInputError,
   allocateSplit as allocate,

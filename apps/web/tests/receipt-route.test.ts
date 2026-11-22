@@ -44,7 +44,7 @@ beforeEach(async () => {
     revision: 1, deletedAt: null, reviewedAt: new Date(0), finalizedAt: null,
     paidByParticipantId: null, splitMode: "EVEN" as const, title: "Dinner",
     merchantName: "Bistro", address: "123 Main", purchasedAt: new Date(0),
-    subtotal: "30.00", tax: "2.70", tip: "6.00", total: "38.70",
+    subtotal: "30.00", discount: null, tax: "2.70", tip: "6.00", total: "38.70",
   };
   await prisma.receipt.upsert({
     where: { id: receiptId }, update: fields,
@@ -119,6 +119,25 @@ describe("owned receipt reads and corrections", () => {
     expect(body.reviewedAt).not.toBeNull();
     expect(body.parseStatus).toBe("FAILED");
     expect(body.items.every((row: { isVerified: boolean }) => row.isVerified)).toBe(true);
+  });
+
+  it("accepts a bounded receipt discount and uses it during review reconciliation", async () => {
+    const res = await request("PATCH", { discount: "3.00", total: "35.70", reviewConfirmed: true });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(Number(body.discount)).toBe(3);
+    expect(body.reviewedAt).not.toBeNull();
+    const stored = await prisma.receipt.findUniqueOrThrow({ where: { id: receiptId } });
+    expect(stored.discount?.toFixed(2)).toBe("3.00");
+    expect(stored.total?.toFixed(2)).toBe("35.70");
+  });
+
+  it("rejects a receipt discount above subtotal without changing the draft", async () => {
+    const before = await snapshot();
+    const res = await request("PATCH", { discount: "30.01" });
+    expect(res.status).toBe(400);
+    expect(await snapshot()).toEqual(before);
+    expect(cache.revalidatePath).not.toHaveBeenCalled();
   });
 
   it("rolls back field edits and revision when review cannot reconcile", async () => {

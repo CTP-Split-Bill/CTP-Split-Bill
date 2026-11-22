@@ -27,7 +27,7 @@ export const guestReceiptSelect = {
     },
     orderBy: { lineNumber: "asc" },
   },
-  bills: { select: { participantId: true, amountOwed: true, paidAt: true } },
+  bills: { select: { participantId: true, discountShare: true, amountOwed: true, paidAt: true } },
 } satisfies Prisma.ReceiptSelect;
 
 export const pickersOf = (item: {
@@ -64,8 +64,9 @@ export function presentGuestReceipt(receipt: Prisma.ReceiptGetPayload<{ select: 
     participants: receipt.participants.map(({ id, displayName }) => {
       const bill = bills.get(id);
       const owed = bill ? toCents(bill.amountOwed.toString()) : 0n;
+      const discountShare = bill ? toCents(bill.discountShare.toString()) : 0n;
       return {
-        id, displayName, amountOwed: centsToMoney(owed),
+        id, displayName, discountShare: centsToMoney(discountShare), amountOwed: centsToMoney(owed),
         settled: bill ? isBillSettled(bill, owed, receipt.paidByParticipantId) : true,
       };
     }),

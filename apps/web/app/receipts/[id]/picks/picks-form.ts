@@ -24,6 +24,7 @@ export type BoardReceipt = {
   pickingOpen: boolean;
   splitMode: SplitMode;
   subtotal: string | null;
+  discount: string | null;
   tax: string | null;
   tip: string | null;
   total: string | null;
@@ -45,6 +46,7 @@ export function toBoardReceipt(
     picksOpenedAt: Date | string | null;
     splitMode: string;
     subtotal: Money;
+    discount?: Money;
     tax: Money;
     tip: Money;
     total: Money;
@@ -85,6 +87,7 @@ export function toBoardReceipt(
     pickingOpen: r.status === "DRAFT" && r.picksOpenedAt !== null,
     splitMode: (["EVEN", "ITEMIZED", "SHARED_ITEMS"].includes(r.splitMode) ? r.splitMode : "ITEMIZED") as SplitMode,
     subtotal: money(r.subtotal),
+    discount: money(r.discount ?? null),
     tax: money(r.tax),
     tip: money(r.tip),
     total: money(r.total),
@@ -329,6 +332,7 @@ export function boardView(receipt: BoardReceipt): BoardView {
   const totals = boardTotals({
     splitMode: receipt.splitMode,
     subtotal: receipt.subtotal,
+    discount: receipt.discount,
     tax: receipt.tax,
     tip: receipt.tip,
     participants: receipt.people,

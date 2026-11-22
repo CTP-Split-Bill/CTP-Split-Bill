@@ -11,7 +11,7 @@ function Readiness({ label }: { label: string | null }) {
 }
 
 export function SummaryTable({ summary }: { summary: Summary }) {
-  const { rows, totals } = summary;
+  const { rows, totals, hasDiscount } = summary;
   return (
     <Card>
       <CardHeader>
@@ -31,7 +31,7 @@ export function SummaryTable({ summary }: { summary: Summary }) {
                 <span className="font-semibold tabular-nums">{row.owes}</span>
               </div>
               <p className="text-sm text-ink-muted tabular-nums">
-                Items {row.subtotal} · Tax {row.tax} · Tip {row.tip}
+                Items {row.subtotal}{hasDiscount && ` · Discount ${row.discount}`} · Tax {row.tax} · Tip {row.tip}
               </p>
             </li>
           ))}
@@ -46,6 +46,7 @@ export function SummaryTable({ summary }: { summary: Summary }) {
             <tr className="border-b border-line text-left text-ink-muted">
               <th scope="col" className="py-2 font-medium">Person</th>
               <th scope="col" className="py-2 text-right font-medium">Items</th>
+              {hasDiscount && <th scope="col" className="py-2 text-right font-medium">Discount</th>}
               <th scope="col" className="py-2 text-right font-medium">Tax</th>
               <th scope="col" className="py-2 text-right font-medium">Tip</th>
               <th scope="col" className="py-2 text-right font-medium">Owes</th>
@@ -61,6 +62,7 @@ export function SummaryTable({ summary }: { summary: Summary }) {
                   </span>
                 </th>
                 <td className="py-3 text-right tabular-nums">{row.subtotal}</td>
+                {hasDiscount && <td className="py-3 text-right tabular-nums">{row.discount}</td>}
                 <td className="py-3 text-right tabular-nums">{row.tax}</td>
                 <td className="py-3 text-right tabular-nums">{row.tip}</td>
                 <td className="py-3 text-right font-semibold tabular-nums">{row.owes}</td>
@@ -71,6 +73,7 @@ export function SummaryTable({ summary }: { summary: Summary }) {
             <tr className="font-semibold">
               <th scope="row" className="py-3 text-left">Total</th>
               <td className="py-3 text-right tabular-nums">{totals.subtotal}</td>
+              {hasDiscount && <td className="py-3 text-right tabular-nums">{totals.discount}</td>}
               <td className="py-3 text-right tabular-nums">{totals.tax}</td>
               <td className="py-3 text-right tabular-nums">{totals.tip}</td>
               <td className="py-3 text-right tabular-nums">{totals.owes}</td>

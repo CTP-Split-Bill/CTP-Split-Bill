@@ -26,9 +26,45 @@ describe("allocateSplit", () => {
         { totalPrice: 1000n, shares: [{ memberId: "a", weight: 1 }, { memberId: "b", weight: 1 }] },
       ],
     })).toEqual([
-      { memberId: "a", subtotal: 2500n, taxShare: 225n, tipShare: 500n, amountOwed: 3225n },
-      { memberId: "b", subtotal: 500n, taxShare: 45n, tipShare: 100n, amountOwed: 645n },
+      { memberId: "a", subtotal: 2500n, discountShare: 0n, taxShare: 225n, tipShare: 500n, amountOwed: 3225n },
+      { memberId: "b", subtotal: 500n, discountShare: 0n, taxShare: 45n, tipShare: 100n, amountOwed: 645n },
     ]);
+  });
+
+  it("allocates a receipt discount proportionally in cents", () => {
+    const bills = allocateSplit({
+      ...base, splitMode: "ITEMIZED", members: members.slice(0, 2), subtotal: 3000n,
+      discount: 300n,
+      items: [
+        { totalPrice: 2000n, shares: [{ memberId: "a", weight: 1 }] },
+        { totalPrice: 1000n, shares: [{ memberId: "b", weight: 1 }] },
+      ],
+    });
+    expect(bills.map(({ subtotal, discountShare, amountOwed }) => ({ subtotal, discountShare, amountOwed }))).toEqual([
+      { subtotal: 2000n, discountShare: 200n, amountOwed: 1800n },
+      { subtotal: 1000n, discountShare: 100n, amountOwed: 900n },
+    ]);
+    expect(bills.reduce((sum, bill) => sum + bill.discountShare, 0n)).toBe(300n);
+    expect(bills.reduce((sum, bill) => sum + bill.amountOwed, 0n)).toBe(2700n);
+  });
+
+  it("caps rounded discount shares at each member's subtotal and reallocates leftover cents", () => {
+    const group = [1500, 1500, 900, 500, 500, 200].map((weight, index) => ({
+      id: `m${index}`, joinedAt: new Date(index * 1000), weight,
+    }));
+    const bills = allocateSplit({
+      splitMode: "ITEMIZED", subtotal: 26n, discount: 25n, tax: 0n, tip: 0n,
+      members: group,
+      items: [{
+        totalPrice: 26n,
+        shares: group.map(({ id, weight }) => ({ memberId: id, weight })),
+      }],
+    });
+    expect(bills.map((bill) => [bill.subtotal, bill.discountShare, bill.amountOwed])).toEqual([
+      [8n, 8n, 0n], [8n, 7n, 1n], [5n, 5n, 0n], [2n, 2n, 0n], [2n, 2n, 0n], [1n, 1n, 0n],
+    ]);
+    expect(bills.reduce((sum, bill) => sum + bill.discountShare, 0n)).toBe(25n);
+    expect(bills.every((bill) => bill.amountOwed >= 0n)).toBe(true);
   });
 
   it("rounds each column separately using exact unrounded subtotals", () => {
@@ -50,7 +86,7 @@ describe("allocateSplit", () => {
     const bills = allocateSplit({ ...base, splitMode: "ITEMIZED", tax: 100n, tip: 200n,
       items: [{ totalPrice: 1000n, shares: [{ memberId: "a", weight: 1 }] }],
     });
-    expect(bills[1]).toEqual({ memberId: "b", subtotal: 0n, taxShare: 0n, tipShare: 0n, amountOwed: 0n });
+    expect(bills[1]).toEqual({ memberId: "b", subtotal: 0n, discountShare: 0n, taxShare: 0n, tipShare: 0n, amountOwed: 0n });
   });
 
   it("supports unequal weights and large intermediate values without floats", () => {

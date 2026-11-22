@@ -81,7 +81,7 @@ what to pay without an account or a second link.
   Phones, emails, bills, owner id and image data are never returned while the
   receipt is a draft.
 - On a FINALIZED receipt, GET returns the same receipt and item fields plus,
-  for every participant, display name, amount owed and settled state, and the
+  for every participant, display name, discount share, amount owed and settled state, and the
   payer's display name. Amounts come from the receipt's bills (bills/list.md)
   in the same fixed decimal strings. Phones, emails, owner id and image data
   are still never returned.
@@ -149,7 +149,7 @@ what to pay without an account or a second link.
   exactly `id`, `lineNumber`, `name`, `quantity`, `totalPrice` and `pickedBy`,
   with the same serialization and ordering as a personal-link GET.
   Participants include everyone, including the organizer, with exactly `id`,
-  `displayName`, `amountOwed` and `settled`. Amounts and settlement follow the
+  `displayName`, `discountShare`, `amountOwed` and `settled`. Amounts and settlement follow the
   existing personal-link projection and bills/list.md; `paidBy` is the payer's
   display name or null. There is no holder `participantId` or
   `picksSubmittedAt`, and no claim roster in the finalized response.

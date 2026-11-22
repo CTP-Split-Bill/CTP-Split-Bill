@@ -45,6 +45,7 @@ export const UpdateReceipt = ExpectedRevision.extend({
   address: z.string().trim().min(1).max(500).nullable().optional(),
   purchasedAt: z.string().datetime({ offset: true }).nullable().optional(),
   subtotal: money.nullable().optional(),
+  discount: money.nullable().optional(),
   tax: money.nullable().optional(),
   tip: money.nullable().optional(),
   total: money.nullable().optional(),
@@ -61,7 +62,7 @@ export const receiptDetail = {
   organizerParticipantId: true, picksOpenedAt: true, groupTokenHash: true,
   status: true, parseStatus: true, splitMode: true, revision: true,
   reviewedAt: true, finalizedAt: true, merchantName: true, address: true,
-  purchasedAt: true, currency: true, subtotal: true, tax: true, tip: true,
+  purchasedAt: true, currency: true, subtotal: true, discount: true, tax: true, tip: true,
   total: true, createdAt: true, updatedAt: true,
   participants: {
     select: {
@@ -114,7 +115,7 @@ export function presentReceipt<
 // Used at confirmation and finalization; the pure allocator only receives
 // complete, validated integer cents.
 export function validateReceiptInformation(receipt: {
-  subtotal: StoredMoney; tax: StoredMoney; tip: StoredMoney; total: StoredMoney;
+  subtotal: StoredMoney; discount?: StoredMoney; tax: StoredMoney; tip: StoredMoney; total: StoredMoney;
   items: { name: string | null; quantity: StoredMoney; unitPrice: StoredMoney; totalPrice: StoredMoney }[];
 }) {
   if (receipt.subtotal === null || receipt.tax === null || receipt.total === null) {
@@ -126,6 +127,7 @@ export function validateReceiptInformation(receipt: {
     throw new ApiError("INVALID_INPUT", "Every item needs a name, positive quantity, unit price, and total price", 400);
   }
   const subtotal = toCents(receipt.subtotal.toString());
+  const discount = receipt.discount == null ? 0n : toCents(receipt.discount.toString());
   const tax = toCents(receipt.tax.toString());
   const tip = receipt.tip === null ? 0n : toCents(receipt.tip.toString());
   const total = toCents(receipt.total.toString());
@@ -133,10 +135,10 @@ export function validateReceiptInformation(receipt: {
     toCents(item.unitPrice!.toString());
     return sum + toCents(item.totalPrice!.toString());
   }, 0n);
-  if (subtotal <= 0n || itemTotal !== subtotal || subtotal + tax + tip !== total) {
-    throw new ApiError("INVALID_INPUT", "Items, subtotal, tax, tip, and total must reconcile", 400);
+  if (subtotal <= 0n || discount > subtotal || itemTotal !== subtotal || subtotal - discount + tax + tip !== total) {
+    throw new ApiError("INVALID_INPUT", "Items, subtotal, discount, tax, tip, and total must reconcile", 400);
   }
-  return { subtotal, tax, tip, total };
+  return { subtotal, discount, tax, tip, total };
 }
 
 export async function listReceipts(userId: string) {
@@ -173,7 +175,7 @@ export async function updateReceipt(userId: string, receiptId: string, input: Up
   const scope = receiptScope(userId, receiptId);
   return prisma.$transaction(async (tx) => {
     await lockEditableReceipt(tx, userId, receiptId, input.expectedRevision);
-    const current = await tx.receipt.findFirstOrThrow({ where: scope, select: { splitMode: true } });
+    const current = await tx.receipt.findFirstOrThrow({ where: scope, select: { splitMode: true, subtotal: true, discount: true } });
     if (input.paidByParticipantId != null) {
       const payer = await tx.participant.findFirst({
         where: { id: input.paidByParticipantId, receiptId, receipt: scope }, select: { id: true },
@@ -188,14 +190,19 @@ export async function updateReceipt(userId: string, receiptId: string, input: Up
         await tx.receiptItem.updateMany({ where: { receiptId, receipt: scope }, data: { assignedParticipantId: null } });
       }
     }
-    const changesContent = ["title", "merchantName", "address", "purchasedAt", "subtotal", "tax", "tip", "total"]
+    const nextSubtotal = input.subtotal === undefined ? current.subtotal : input.subtotal === null ? null : input.subtotal;
+    const nextDiscount = input.discount === undefined ? current.discount : input.discount === null ? null : input.discount;
+    if (nextSubtotal !== null && nextDiscount !== null && toCents(nextDiscount.toString()) > toCents(nextSubtotal.toString())) {
+      throw new ApiError("INVALID_INPUT", "Discount cannot exceed subtotal", 400);
+    }
+    const changesContent = ["title", "merchantName", "address", "purchasedAt", "subtotal", "discount", "tax", "tip", "total"]
       .some((key) => input[key as keyof UpdateReceiptInput] !== undefined);
     const receipt = await tx.receipt.update({
       where: scope,
       data: {
         title: input.title, merchantName: input.merchantName, address: input.address,
         purchasedAt: input.purchasedAt === undefined ? undefined : input.purchasedAt === null ? null : new Date(input.purchasedAt),
-        subtotal: input.subtotal, tax: input.tax, tip: input.tip, total: input.total,
+        subtotal: input.subtotal, discount: input.discount, tax: input.tax, tip: input.tip, total: input.total,
         paidByParticipantId: input.paidByParticipantId, splitMode: input.splitMode,
         reviewedAt: changesContent ? null : undefined,
       },
