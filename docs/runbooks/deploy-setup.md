@@ -85,8 +85,11 @@ The newest revision has 100% traffic and an image ending in main's SHA
 
 ## If this didn't work
 
-- `AADSTS70021` / no matching federated identity: the subject in step 4 must
-  match exactly, including the environment name `production`.
+- `AADSTS700213` / no matching federated identity: the subject must match
+  the one in the error exactly. This org's repo presents the ID form,
+  `repo:CTP-Split-Bill@360071780/CTP-Split-Bill@1376436417:environment:production`;
+  add a second credential (another `-n`/`name`) with the subject copied
+  from the error.
 - `AuthorizationFailed` in the workflow: step 5 did not apply, or it was
   scoped to the wrong resource group.
 - Migration step cannot connect: confirm the `database-url` secret works from
