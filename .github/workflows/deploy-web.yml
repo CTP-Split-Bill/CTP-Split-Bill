@@ -1,0 +1,143 @@
+# Deploy — ships the image CI just published. See docs/specs/deploy.md.
+# migrate → new revision at 0% → smoke /api/health → promote to 100%.
+# A failed smoke test leaves the old revision serving all traffic.
+
+name: Deploy web
+
+on:
+  workflow_run:
+    workflows: ["Publish web image to GHCR"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Commit SHA of a published image (default: tip of main)"
+        required: false
+
+permissions:
+  contents: read
+  id-token: write # OIDC login to Azure; no stored Azure password
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  APP: ctpsplitbill-web
+  RG: ctp-split-bill
+  DB_SERVER: ctpsplitbillpgdev
+  IMAGE: ghcr.io/kev-s0l/ctp-split-bill-web
+
+jobs:
+  deploy:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Resolve the image tag
+        run: |
+          TAG="${{ github.event.workflow_run.head_sha || inputs.image_tag || github.sha }}"
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
+          echo "SUFFIX=r${{ github.run_number }}-${TAG:0:7}" >> "$GITHUB_ENV"
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Preflight — app running, multiple-revision mode
+        run: |
+          read -r MODE STATUS < <(az containerapp show -n "$APP" -g "$RG" \
+            --query "[properties.configuration.activeRevisionsMode, properties.runningStatus]" -o tsv | tr '\n' ' ')
+          if [ "$MODE" != "Multiple" ]; then
+            echo "::error::$APP is in $MODE revision mode; zero-traffic deploys need Multiple. See docs/runbooks/deploy-setup.md."
+            exit 1
+          fi
+          if [ "$STATUS" = "Stopped" ]; then
+            echo "::error::$APP is stopped. Start it (az containerapp start -n $APP -g $RG) and re-run this workflow."
+            exit 1
+          fi
+          CURRENT=$(az containerapp revision list -n "$APP" -g "$RG" \
+            --query "[?properties.trafficWeight==\`100\`].name | [0]" -o tsv)
+          echo "CURRENT=$CURRENT" >> "$GITHUB_ENV"
+          echo "Serving now: $CURRENT"
+
+      # Migrations run before the new code takes traffic, so they must be
+      # safe for the revision that is still serving (add, don't rename/drop).
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --filter "@project/migrate..."
+
+      - name: Open the database firewall to this runner
+        run: |
+          RUNNER_IP=$(curl -fsS https://api.ipify.org)
+          echo "RULE=gh-deploy-${{ github.run_id }}" >> "$GITHUB_ENV"
+          az postgres flexible-server firewall-rule create -g "$RG" --server-name "$DB_SERVER" \
+            --name "gh-deploy-${{ github.run_id }}" \
+            --start-ip-address "$RUNNER_IP" --end-ip-address "$RUNNER_IP" -o none
+
+      - name: Apply migrations
+        run: |
+          DATABASE_URL=$(az containerapp secret show -n "$APP" -g "$RG" \
+            --secret-name database-url --query value -o tsv)
+          echo "::add-mask::$DATABASE_URL"
+          DATABASE_URL="$DATABASE_URL" pnpm db:migrate
+
+      - name: Close the database firewall
+        if: always() && env.RULE != ''
+        run: |
+          az postgres flexible-server firewall-rule delete -g "$RG" --server-name "$DB_SERVER" \
+            --name "$RULE" --yes -o none
+
+      - name: Create the new revision at 0% traffic
+        run: |
+          # Pin traffic to the serving revision by name first; otherwise
+          # "latest revision" routing would hand the new one 100% on creation.
+          if [ -n "$CURRENT" ]; then
+            az containerapp ingress traffic set -n "$APP" -g "$RG" \
+              --revision-weight "$CURRENT=100" -o none
+          fi
+          az containerapp update -n "$APP" -g "$RG" \
+            --image "$IMAGE:$TAG" --revision-suffix "$SUFFIX" -o none
+          echo "NEW=$APP--$SUFFIX" >> "$GITHUB_ENV"
+
+      - name: Smoke test the new revision
+        run: |
+          FQDN=$(az containerapp revision show -n "$APP" -g "$RG" \
+            --revision "$NEW" --query properties.fqdn -o tsv)
+          # Scale-to-zero means the first request is a cold start: retry ~3 min.
+          for i in $(seq 1 18); do
+            BODY=$(curl -fsS -m 20 "https://$FQDN/api/health" || true)
+            echo "attempt $i: ${BODY:-no response}"
+            if echo "$BODY" | grep -q '"db":"ok"'; then exit 0; fi
+            sleep 10
+          done
+          echo "::error::$NEW never reported db:ok. Traffic stays on $CURRENT."
+          exit 1
+
+      - name: Promote to 100%
+        run: |
+          WEIGHTS="$NEW=100"
+          if [ -n "$CURRENT" ]; then WEIGHTS="$WEIGHTS $CURRENT=0"; fi
+          az containerapp ingress traffic set -n "$APP" -g "$RG" \
+            --revision-weight $WEIGHTS -o none
+          # Keep the previous revision active for instant rollback; retire older ones.
+          az containerapp revision list -n "$APP" -g "$RG" \
+            --query "[?properties.active && name!='$NEW' && name!='$CURRENT'].name" -o tsv \
+            | xargs -r -n1 az containerapp revision deactivate -n "$APP" -g "$RG" -o none --revision
+          echo "Promoted $NEW. Roll back with: az containerapp ingress traffic set -n $APP -g $RG --revision-weight $CURRENT=100 $NEW=0"
+
+      - name: Deactivate the failed revision
+        if: failure() && env.NEW != ''
+        run: az containerapp revision deactivate -n "$APP" -g "$RG" --revision "$NEW" -o none

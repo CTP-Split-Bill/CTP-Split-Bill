@@ -31,4 +31,5 @@ Start from [`_template.md`](_template.md).
 
 | Runbook | When |
 |---|---|
+| [deploy-setup](deploy-setup.md) | Set up automatic deploys, or the deploy workflow cannot reach Azure |
 | [receipt-ocr](receipt-ocr.md) | Provision or verify local OCR, or diagnose a parse 503 |
