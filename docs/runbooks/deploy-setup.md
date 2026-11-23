@@ -9,6 +9,12 @@ resource group, or the Deploy web workflow fails at Azure login or preflight.
 - `az login` with **Owner** on resource group `ctp-split-bill` (Contributor
   cannot do step 5). Check: `az role assignment list --assignee "$(az ad signed-in-user show --query id -o tsv)" --all -o table`.
 - **Admin** on the GitHub repo `kev-s0l/CTP-Split-Bill` (step 6).
+- The app's environment is standard, not express. Check:
+  `az rest --method get --url "https://management.azure.com$(az containerapp env show -n ctpsplitbill-env -g ctp-split-bill --query id -o tsv)?api-version=2025-10-02-preview" --query properties.environmentMode -o tsv`
+  prints `WorkloadProfiles`. If it prints `Express`, step 2 fails: delete the
+  environment (and its apps) and recreate it with an `az rest --method put`
+  to the same URL, body `{"location":"northcentralus","properties":{"environmentMode":"WorkloadProfiles","workloadProfiles":[{"name":"Consumption","workloadProfileType":"Consumption"}]}}`.
+  Plain `az containerapp env create` can produce an express one.
 - Blast radius: step 2 changes how traffic routes; the live app keeps
   serving the same revision throughout.
 
@@ -58,8 +64,9 @@ resource group, or the Deploy web workflow fails at Azure login or preflight.
 8. Start the app if it is stopped:
    ```bash
    az containerapp show -n $APP -g $RG --query properties.runningStatus -o tsv
-   az containerapp start -n $APP -g $RG   # only if the line above says Stopped
    ```
+   If it says `Stopped`: portal → `ctpsplitbill-web` → *Overview* → **Start**.
+   (`az containerapp start` exists only with `az extension add -n containerapp`.)
 9. Run the first deploy of the tip of main:
    ```bash
    gh workflow run deploy-web.yml -R $REPO

@@ -64,6 +64,10 @@ merge to main
   pulls without registry credentials.
 - Container Apps consumption, min replicas 0 (scale-to-zero is the default
   posture); anything needing always-on gets its own discussion.
+- The environment is standard (`environmentMode: WorkloadProfiles`, the
+  Consumption profile), never express: express allows one active revision,
+  so the 0%-then-promote gate cannot run there. `az containerapp env create`
+  and the portal can produce an express environment without asking.
 - Migrations run before the new revision takes traffic, so the revision
   still serving must work against the migrated schema. Migrations add; a
   rename or drop ships as add → deploy → remove in a later migration.

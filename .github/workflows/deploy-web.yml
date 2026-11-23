@@ -26,7 +26,7 @@ concurrency:
 env:
   APP: ctpsplitbill-web
   RG: ctp-split-bill
-  DB_SERVER: ctpsplitbillpgdev
+  DB_SERVER: ctpsplitbill-db
   IMAGE: ghcr.io/kev-s0l/ctp-split-bill-web
 
 jobs:
@@ -62,7 +62,7 @@ jobs:
             exit 1
           fi
           if [ "$STATUS" = "Stopped" ]; then
-            echo "::error::$APP is stopped. Start it (az containerapp start -n $APP -g $RG) and re-run this workflow."
+            echo "::error::$APP is stopped. Start it (portal → Overview → Start) and re-run this workflow."
             exit 1
           fi
           CURRENT=$(az containerapp revision list -n "$APP" -g "$RG" \
