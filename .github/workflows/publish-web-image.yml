@@ -30,6 +30,10 @@ jobs:
         with:
           ref: ${{ env.IMAGE_TAG }}
 
+      # Image names must be lowercase; the org name is not.
+      - name: Resolve the image name
+        run: echo "IMAGE=ghcr.io/$(echo "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')/ctp-split-bill-web" >> "$GITHUB_ENV"
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -47,11 +51,11 @@ jobs:
           file: ./Dockerfile.web
           platforms: linux/amd64
           push: true
-          tags: ghcr.io/${{ github.repository_owner }}/ctp-split-bill-web:${{ env.IMAGE_TAG }}
+          tags: ${{ env.IMAGE }}:${{ env.IMAGE_TAG }}
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
       - name: Show published image
-        run: echo "Published ghcr.io/${{ github.repository_owner }}/ctp-split-bill-web:${IMAGE_TAG}"
+        run: echo "Published ${IMAGE}:${IMAGE_TAG}"

@@ -27,7 +27,7 @@ env:
   APP: ctpsplitbill-web
   RG: ctp-split-bill
   DB_SERVER: ctpsplitbill-db
-  IMAGE: ghcr.io/kev-s0l/ctp-split-bill-web
+  IMAGE: ghcr.io/ctp-split-bill/ctp-split-bill-web
 
 jobs:
   deploy:

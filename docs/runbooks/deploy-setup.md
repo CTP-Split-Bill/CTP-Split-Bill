@@ -8,7 +8,7 @@ resource group, or the Deploy web workflow fails at Azure login or preflight.
 
 - `az login` with **Owner** on resource group `ctp-split-bill` (Contributor
   cannot do step 5). Check: `az role assignment list --assignee "$(az ad signed-in-user show --query id -o tsv)" --all -o table`.
-- **Admin** on the GitHub repo `kev-s0l/CTP-Split-Bill` (step 6).
+- **Admin** on the GitHub repo `CTP-Split-Bill/CTP-Split-Bill` (step 6).
 - The app's environment is standard, not express. Check:
   `az rest --method get --url "https://management.azure.com$(az containerapp env show -n ctpsplitbill-env -g ctp-split-bill --query id -o tsv)?api-version=2025-10-02-preview" --query properties.environmentMode -o tsv`
   prints `WorkloadProfiles`. If it prints `Express`, step 2 fails: delete the
@@ -23,7 +23,7 @@ resource group, or the Deploy web workflow fails at Azure login or preflight.
 1. Set shell variables:
    ```bash
    APP=ctpsplitbill-web RG=ctp-split-bill ID=gh-deploy-ctpsplitbill
-   REPO=kev-s0l/CTP-Split-Bill
+   REPO=CTP-Split-Bill/CTP-Split-Bill
    ```
 2. Switch to multiple-revision mode and pin traffic to the serving revision:
    ```bash
