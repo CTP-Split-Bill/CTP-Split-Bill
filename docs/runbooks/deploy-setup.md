@@ -22,7 +22,7 @@ resource group, or the Deploy web workflow fails at Azure login or preflight.
 
 1. Set shell variables:
    ```bash
-   APP=ctpsplitbill-web RG=ctp-split-bill ID=gh-deploy-ctpsplitbill
+   APP=ctpsplitbill-web RG=ctp-split-bill
    REPO=CTP-Split-Bill/CTP-Split-Bill
    ```
 2. Switch to multiple-revision mode and pin traffic to the serving revision:
@@ -31,20 +31,19 @@ resource group, or the Deploy web workflow fails at Azure login or preflight.
    CURRENT=$(az containerapp revision list -n $APP -g $RG --query "[?properties.trafficWeight==\`100\`].name | [0]" -o tsv)
    az containerapp ingress traffic set -n $APP -g $RG --revision-weight $CURRENT=100
    ```
-3. Create the identity the workflow logs in as:
+3. Create the app registration the workflow logs in as:
    ```bash
-   az identity create -g $RG -n $ID -o none
-   CLIENT_ID=$(az identity show -g $RG -n $ID --query clientId -o tsv)
-   PRINCIPAL_ID=$(az identity show -g $RG -n $ID --query principalId -o tsv)
+   CLIENT_ID=$(az ad app create --display-name gh-deploy-ctpsplitbill --query appId -o tsv)
+   az ad sp create --id $CLIENT_ID -o none
+   PRINCIPAL_ID=$(az ad sp show --id $CLIENT_ID --query id -o tsv)
+   echo "client=$CLIENT_ID principal=$PRINCIPAL_ID"   # both must print
    ```
 4. Trust GitHub's `production` environment to log in as it:
    ```bash
-   az identity federated-credential create -g $RG --identity-name $ID -n github-production \
-     --issuer https://token.actions.githubusercontent.com \
-     --subject repo:$REPO:environment:production \
-     --audiences api://AzureADTokenExchange
+   az ad app federated-credential create --id $CLIENT_ID --parameters "{\"name\":\"github-production\",\"issuer\":\"https://token.actions.githubusercontent.com\",\"subject\":\"repo:$REPO:environment:production\",\"audiences\":[\"api://AzureADTokenExchange\"]}"
    ```
-5. Grant it Contributor on the resource group only:
+5. Grant it Contributor on the resource group only (retry after 30 s if
+   the principal is not found yet):
    ```bash
    az role assignment create --assignee-object-id $PRINCIPAL_ID \
      --assignee-principal-type ServicePrincipal --role Contributor \

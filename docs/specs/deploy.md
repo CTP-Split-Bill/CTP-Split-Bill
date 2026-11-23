@@ -25,8 +25,8 @@ merge to main
 
 - CI is the **only** place images are built. Contributor laptops never need
   docker. Each image is tagged with the commit SHA it was built from.
-- Deploy authenticates to Azure with GitHub OIDC (federated credential on a
-  managed identity). No Azure password is stored in GitHub.
+- Deploy authenticates to Azure with GitHub OIDC (federated credential on
+  an Entra ID app registration). No Azure password is stored in GitHub.
 - Migrations read `DATABASE_URL` from the Container App's own secret; there
   is one copy of the connection string. The workflow opens a firewall rule
   for the runner's IP and removes it whether or not the migration succeeds.
@@ -68,6 +68,10 @@ merge to main
   Consumption profile), never express: express allows one active revision,
   so the 0%-then-promote gate cannot run there. `az containerapp env create`
   and the portal can produce an express environment without asking.
+- The deploy identity is an app registration, not a user-assigned managed
+  identity: the subscription does not register `Microsoft.ManagedIdentity`,
+  and registering a provider needs subscription-level rights the resource
+  group's owner lacks.
 - Migrations run before the new revision takes traffic, so the revision
   still serving must work against the migrated schema. Migrations add; a
   rename or drop ships as add → deploy → remove in a later migration.
