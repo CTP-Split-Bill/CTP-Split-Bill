@@ -40,7 +40,7 @@ resource group, or the Deploy web workflow fails at Azure login or preflight.
    ```
 4. Trust GitHub's `production` environment to log in as it:
    ```bash
-   az ad app federated-credential create --id $CLIENT_ID --parameters "{\"name\":\"github-production\",\"issuer\":\"https://token.actions.githubusercontent.com\",\"subject\":\"repo:$REPO:environment:production\",\"audiences\":[\"api://AzureADTokenExchange\"]}"
+   az ad app federated-credential create --id $CLIENT_ID --parameters "{\"name\":\"github-production\",\"issuer\":\"https://token.actions.githubusercontent.com\",\"subject\":\"repo:${REPO}:environment:production\",\"audiences\":[\"api://AzureADTokenExchange\"]}"
    ```
 5. Grant it Contributor on the resource group only (retry after 30 s if
    the principal is not found yet):
