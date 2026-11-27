@@ -21,6 +21,18 @@ const Extraction = z.object({
   })).min(1).max(500),
 });
 
+// A price at the end of a line. Dot-matrix fonts print the decimal point as a
+// tick that OCR reads as a comma, and OCR sometimes adds spaces around it, so
+// "8.99", "$3,49" and "$8 ,99" all count. A comma must be followed by exactly
+// two digits and the line's end, so "1,080" is never a decimal.
+const PRICE = String.raw`\$?\s*(\d+)\s*[.,]\s*(\d{2})`;
+const price = (whole: string, cents: string) => `${whole}.${cents}`;
+const AMOUNT_LINE = new RegExp(`^(sub\\s*total|tax|tip|total)\\s*:?\\s*${PRICE}$`, "i");
+const ITEM_LINE = new RegExp(`^(.+?)\\s+${PRICE}$`);
+const EXPLICIT_ITEM = new RegExp(`^(\\d+(?:\\.\\d{1,3})?)\\s*[x×]\\s+(.+?)\\s+@\\s*${PRICE}$`, "i");
+// "Store: 7361 | Register: 20" is a store number, not a merchant name.
+const STORE_NUMBER = /^#?\d+(?:\s*[|,/-]?\s*(?:register|reg|terminal|term|lane|pos)\b.*)?$/i;
+
 // Only explicit labels and line prices are extracted. Missing quantities and
 // unit prices remain unknown, even when assuming one would balance the receipt.
 export function extractReceiptText(text: unknown) {
@@ -34,16 +46,17 @@ export function extractReceiptText(text: unknown) {
   const seen = new Set<string>();
   for (const raw of text.split(/\r?\n/)) {
     const line = raw.trim().replace(/\s+/g, " ");
-    const amount = line.match(/^(sub\s*total|tax|tip|total)\s*:?\s*\$?(\d+\.\d{2})$/i);
+    const amount = line.match(AMOUNT_LINE);
     if (amount) {
       const key = amount[1].toLowerCase().replace(/\s/g, "") as "subtotal" | "tax" | "tip" | "total";
-      result[key] = seen.has(key) ? null : amount[2];
+      result[key] = seen.has(key) ? null : price(amount[2], amount[3]);
       seen.add(key);
       continue;
     }
     const metadata = line.match(/^(merchant|store|address|date)\s*:\s*(.+)$/i);
     if (metadata) {
       const key = metadata[1].toLowerCase();
+      if (key === "store" && STORE_NUMBER.test(metadata[2])) continue;
       const field = key === "merchant" || key === "store" ? "merchantName" : key === "date" ? "purchasedAt" : "address";
       const value = metadata[2];
       const date = /^\d{4}-\d{2}-\d{2}$/.test(value) ? new Date(`${value}T00:00:00.000Z`) : null;
@@ -55,12 +68,12 @@ export function extractReceiptText(text: unknown) {
     }
     // Summary/payment lines and negative adjustments must not become food items.
     if (/^(?:sub\s*total|tax|tip|total|cash|change|card|visa|mastercard|amex|payment|paid|balance|discount|refund|savings|service|gratuity|amount|thank|tel|phone|order|table|check|receipt|date)\b/i.test(line)) continue;
-    const item = line.match(/^(.+?)\s+\$?(\d+\.\d{2})$/);
+    const item = line.match(ITEM_LINE);
     if (!item || !/[a-z]/i.test(item[1]) || /[-−]\s*\$?\s*$/.test(item[1])) continue;
-    const explicit = item[1].match(/^(\d+(?:\.\d{1,3})?)\s*[x×]\s+(.+?)\s+@\s*\$?(\d+\.\d{2})$/i);
+    const explicit = item[1].match(EXPLICIT_ITEM);
     result.items.push({
       name: explicit ? explicit[2] : item[1], quantity: explicit ? explicit[1] : null,
-      unitPrice: explicit ? explicit[3] : null, totalPrice: item[2],
+      unitPrice: explicit ? price(explicit[3], explicit[4]) : null, totalPrice: price(item[2], item[3]),
     });
   }
   const parsed = Extraction.safeParse(result);

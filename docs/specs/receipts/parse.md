@@ -37,6 +37,13 @@ instead of entering every value by hand, then reviews them before splitting.
 - OCR execution has a 60-second budget; its worker is terminated on success,
   error or timeout. Setup documents any language-data provisioning separately
   from serving requests. Requests perform no language-data downloads.
+- A line price or labelled amount accepts `.` or `,` as the decimal
+  separator when exactly two digits and the end of the line follow it, with
+  stray spaces allowed around it (`$8 ,99` → 8.99, `$3,49` → 3.49).
+  Dot-matrix fonts print the decimal point as a tick that OCR reads as a
+  comma. A comma followed by three digits (`1,080`) is never a decimal.
+- A `Store:` value that is only a number, optionally followed by a register,
+  terminal or lane (`Store: 7361 | Register: 20`), is not a merchant name.
 - Extraction recognizes conservative item-name/line-price pairs and explicitly
   labelled subtotal, tax, tip and total values. Receipt-level discounts remain
   null for manual correction (receipts/edit.md). Uncertain fields stay null;
@@ -76,7 +83,8 @@ instead of entering every value by hand, then reviews them before splitting.
 
 ## Verify
 
-- Fixture-based tests cover extraction, null fields, malformed/oversized
+- Fixture-based tests cover extraction, comma decimals, numeric store
+  labels, null fields, malformed/oversized
   results, schema bounds and labelled totals without requiring an OCR service.
 - Route tests cover authentication, ownership, deletion, revision/state guards,
   actual persisted extracted values, assignment cleanup, rollback, failure
@@ -106,6 +114,8 @@ instead of entering every value by hand, then reviews them before splitting.
 
 ## Out of scope
 
+- Thousands separators in prices, non-USD or locale-specific number formats,
+  and dates other than YYYY-MM-DD.
 - Cloud OCR, background queue delivery, multilingual extraction, confidence UI,
   automatic review/finalization and changes to financial reconciliation.
 - Photo upload: upload.md; image retrieval: image.md; corrections: edit.md and
