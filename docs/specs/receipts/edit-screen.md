@@ -166,6 +166,10 @@ filling totals has to be quick, especially on a phone.
   with `reviewConfirmed: true` for Confirm). When only the fields changed,
   only the PATCH is sent. A request that would change nothing is not sent:
   Save is disabled until something changes.
+- Confirm also sends the items, unchanged, when any saved item has no
+  quantity or unit price (a scan leaves them empty when the receipt doesn't
+  print them). The form shows those rows as Qty 1 with a derived unit price,
+  but the server checks the stored items, so they must be written first.
 - The unit price is not an input; it is saved as the line total divided by
   the quantity, rounded to the cent, the same value the hint shows (receipts/items.md: the line total is
   authoritative).
@@ -250,7 +254,8 @@ filling totals has to be quick, especially on a phone.
   and both checks' wording (short, over, matches, empty tip), Confirm's
   pre-check (each reason, and which field gets focus), the Table
   primitive's slots, which requests Save and Confirm send for
-  items-only, fields-only and both changes, and static renders of the empty,
+  items-only, fields-only and both changes, Confirm sending unchanged
+  items when the saved ones lack quantity or unit price, and static renders of the empty,
   filled, mismatched, picking-open and finalized states.
 - pnpm typecheck and pnpm build pass.
 - Drill (pnpm dev, signed in): on a receipt after a failed scan, type three
@@ -259,7 +264,8 @@ filling totals has to be quick, especially on a phone.
   without saving; the leave prompt shows. Edit it again and press the step
   bar's Back; the unsaved-changes toast shows, Discard leaves without
   saving, and Save and continue saves first. Save from a second, older tab;
-  the conflict message shows.
+  the conflict message shows. Then, on a receipt after a successful scan,
+  change nothing and press Confirm items; People opens.
 - Phone pass at 375px from web.md (and 320px: no amount cut off in its field), and a keyboard-only pass through the
   fields, adding and removing rows, and Confirm.
 

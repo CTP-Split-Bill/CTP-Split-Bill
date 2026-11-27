@@ -231,7 +231,7 @@ export function ItemsEditor({ initial }: { initial: EditorReceipt }) {
       return false;
     }
 
-    const plan = savePlan(form, saved.form, confirm);
+    const plan = savePlan(form, saved.form, confirm, saved.itemsIncomplete);
     setSaving(confirm ? "confirm" : "save");
     let current = saved;
     try {
