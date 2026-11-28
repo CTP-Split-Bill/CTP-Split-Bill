@@ -37,8 +37,8 @@ function detail(overrides: Record<string, unknown> = {}) {
     merchantName: "Thai Place", purchasedAt: new Date("2026-11-02T12:00:00Z"),
     subtotal: "20", tax: "1.8", tip: null, total: "21.80",
     items: [
-      { name: "Pad Thai", quantity: "10", totalPrice: "14" },
-      { name: null, quantity: null, totalPrice: null },
+      { name: "Pad Thai", quantity: "10", unitPrice: "1.40", totalPrice: "14" },
+      { name: null, quantity: null, unitPrice: null, totalPrice: null },
     ],
     ...overrides,
   };
@@ -336,18 +336,35 @@ describe("Save and Confirm requests", () => {
   });
 
   it("sends only a PATCH when only fields changed", () => {
-    expect(form.savePlan(f({ merchant: "Thai House" }), saved, false)).toEqual({ items: false, patch: { merchantName: "Thai House" } });
+    expect(form.savePlan(f({ merchant: "Thai House" }), saved, false, false)).toEqual({ items: false, patch: { merchantName: "Thai House" } });
   });
 
   it("sends only the items when only items changed", () => {
-    expect(form.savePlan(f({ rows: [row("a", "Pad Thai", "15.00"), row("b", "Tea", "6.00")] }), saved, false)).toEqual({ items: true, patch: null });
+    expect(form.savePlan(f({ rows: [row("a", "Pad Thai", "15.00"), row("b", "Tea", "6.00")] }), saved, false, false)).toEqual({ items: true, patch: null });
   });
 
   it("sends both, and Confirm always adds reviewConfirmed", () => {
     const changed = f({ tip: "4.00", rows: [row("a", "Pad Thai", "14.00")] });
-    expect(form.savePlan(changed, saved, true)).toEqual({ items: true, patch: { tip: "4.00", reviewConfirmed: true } });
-    expect(form.savePlan(saved, saved, true)).toEqual({ items: false, patch: { reviewConfirmed: true } });
-    expect(form.savePlan(saved, saved, false)).toEqual({ items: false, patch: null });
+    expect(form.savePlan(changed, saved, true, false)).toEqual({ items: true, patch: { tip: "4.00", reviewConfirmed: true } });
+    expect(form.savePlan(saved, saved, true, false)).toEqual({ items: false, patch: { reviewConfirmed: true } });
+    expect(form.savePlan(saved, saved, false, false)).toEqual({ items: false, patch: null });
+  });
+
+  // A scan stores items without quantity or unit price. The form shows them
+  // as complete, so Confirm used to send only the PATCH and the server
+  // rejected the stored items (docs/postmortems/2026-11-confirm-scanned-items.md).
+  it("flags saved items that have no quantity or unit price", () => {
+    const scanned = { name: "Taco", quantity: null, unitPrice: null, totalPrice: "3.49" };
+    const typed = { name: "Taco", quantity: "1", unitPrice: "3.49", totalPrice: "3.49" };
+    expect(form.toEditorReceipt(detail({ items: [typed, scanned] })).itemsIncomplete).toBe(true);
+    expect(form.toEditorReceipt(detail({ items: [{ ...typed, unitPrice: null }] })).itemsIncomplete).toBe(true);
+    expect(form.toEditorReceipt(detail({ items: [typed] })).itemsIncomplete).toBe(false);
+  });
+
+  it("Confirm sends unchanged items when the saved ones are incomplete; Save doesn't", () => {
+    expect(form.savePlan(saved, saved, true, true)).toEqual({ items: true, patch: { reviewConfirmed: true } });
+    expect(form.savePlan(saved, saved, false, true)).toEqual({ items: false, patch: null });
+    expect(form.savePlan(saved, saved, true, false)).toEqual({ items: false, patch: { reviewConfirmed: true } });
   });
 
   it("saves the date at noon UTC and empty fields as null", () => {

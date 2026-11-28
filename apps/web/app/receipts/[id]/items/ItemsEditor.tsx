@@ -231,7 +231,7 @@ export function ItemsEditor({ initial }: { initial: EditorReceipt }) {
       return false;
     }
 
-    const plan = savePlan(form, saved.form, confirm);
+    const plan = savePlan(form, saved.form, confirm, saved.itemsIncomplete);
     setSaving(confirm ? "confirm" : "save");
     let current = saved;
     try {
@@ -243,7 +243,7 @@ export function ItemsEditor({ initial }: { initial: EditorReceipt }) {
         setSaved(current);
       }
       if (plan.patch) {
-        const fields = savePlan(form, current.form, confirm).patch!;
+        const fields = savePlan(form, current.form, confirm, current.itemsIncomplete).patch!;
         const next = await send(`/api/receipts/${encodeURIComponent(saved.id)}`, "PATCH", { expectedRevision: current.revision, ...fields });
         if (!next) return false;
         current = next;

@@ -24,6 +24,10 @@ export type EditorReceipt = {
   status: string;
   pickingOpen: boolean;
   reviewed: boolean;
+  // A saved item has no quantity or unit price (a scan leaves them empty
+  // when the receipt doesn't print them). The form shows Qty 1 and derives
+  // the unit price, so the rows look complete; Confirm must still send them.
+  itemsIncomplete: boolean;
   form: ReceiptForm;
 };
 
@@ -80,7 +84,7 @@ export function toEditorReceipt(r: {
   tax: Stored;
   tip: Stored;
   total: Stored;
-  items: { name: string | null; quantity: Stored; totalPrice: Stored }[];
+  items: { name: string | null; quantity: Stored; unitPrice: Stored; totalPrice: Stored }[];
 }): EditorReceipt {
   const purchased = r.purchasedAt === null ? "" : new Date(r.purchasedAt).toISOString().slice(0, 10);
   return {
@@ -89,6 +93,7 @@ export function toEditorReceipt(r: {
     status: r.status,
     pickingOpen: r.picksOpenedAt !== null,
     reviewed: r.reviewedAt !== null,
+    itemsIncomplete: r.items.some((item) => item.quantity == null || item.unitPrice == null),
     form: {
       merchant: r.merchantName ?? "",
       date: purchased,
@@ -433,8 +438,14 @@ export type SavePlan = {
   patch: Record<string, string | null | boolean> | null;
 };
 
-export function savePlan(form: ReceiptForm, saved: ReceiptForm, confirm: boolean): SavePlan {
+// Confirm also sends unchanged items when the saved ones are incomplete:
+// the server checks the stored items, not what the form shows. Required, not
+// defaulted, so a caller can't drop it and quietly bring the 400 back.
+export function savePlan(form: ReceiptForm, saved: ReceiptForm, confirm: boolean, itemsIncomplete: boolean): SavePlan {
   const fields: Record<string, string | null | boolean> = changedFields(form, saved);
   if (confirm) fields.reviewConfirmed = true;
-  return { items: itemsChanged(form, saved), patch: Object.keys(fields).length > 0 ? fields : null };
+  return {
+    items: itemsChanged(form, saved) || (confirm && itemsIncomplete),
+    patch: Object.keys(fields).length > 0 ? fields : null,
+  };
 }
