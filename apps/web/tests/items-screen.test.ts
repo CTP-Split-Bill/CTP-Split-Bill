@@ -336,18 +336,18 @@ describe("Save and Confirm requests", () => {
   });
 
   it("sends only a PATCH when only fields changed", () => {
-    expect(form.savePlan(f({ merchant: "Thai House" }), saved, false)).toEqual({ items: false, patch: { merchantName: "Thai House" } });
+    expect(form.savePlan(f({ merchant: "Thai House" }), saved, false, false)).toEqual({ items: false, patch: { merchantName: "Thai House" } });
   });
 
   it("sends only the items when only items changed", () => {
-    expect(form.savePlan(f({ rows: [row("a", "Pad Thai", "15.00"), row("b", "Tea", "6.00")] }), saved, false)).toEqual({ items: true, patch: null });
+    expect(form.savePlan(f({ rows: [row("a", "Pad Thai", "15.00"), row("b", "Tea", "6.00")] }), saved, false, false)).toEqual({ items: true, patch: null });
   });
 
   it("sends both, and Confirm always adds reviewConfirmed", () => {
     const changed = f({ tip: "4.00", rows: [row("a", "Pad Thai", "14.00")] });
-    expect(form.savePlan(changed, saved, true)).toEqual({ items: true, patch: { tip: "4.00", reviewConfirmed: true } });
-    expect(form.savePlan(saved, saved, true)).toEqual({ items: false, patch: { reviewConfirmed: true } });
-    expect(form.savePlan(saved, saved, false)).toEqual({ items: false, patch: null });
+    expect(form.savePlan(changed, saved, true, false)).toEqual({ items: true, patch: { tip: "4.00", reviewConfirmed: true } });
+    expect(form.savePlan(saved, saved, true, false)).toEqual({ items: false, patch: { reviewConfirmed: true } });
+    expect(form.savePlan(saved, saved, false, false)).toEqual({ items: false, patch: null });
   });
 
   // A scan stores items without quantity or unit price. The form shows them

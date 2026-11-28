@@ -439,8 +439,9 @@ export type SavePlan = {
 };
 
 // Confirm also sends unchanged items when the saved ones are incomplete:
-// the server checks the stored items, not what the form shows.
-export function savePlan(form: ReceiptForm, saved: ReceiptForm, confirm: boolean, itemsIncomplete = false): SavePlan {
+// the server checks the stored items, not what the form shows. Required, not
+// defaulted, so a caller can't drop it and quietly bring the 400 back.
+export function savePlan(form: ReceiptForm, saved: ReceiptForm, confirm: boolean, itemsIncomplete: boolean): SavePlan {
   const fields: Record<string, string | null | boolean> = changedFields(form, saved);
   if (confirm) fields.reviewConfirmed = true;
   return {

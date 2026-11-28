@@ -77,7 +77,11 @@ allowed, and Save stays disabled until something changes.
   "after a successful scan, change nothing and press Confirm items".
 - `apps/web/tests/items-screen.test.ts`: loading flags incomplete stored items,
   and Confirm (not Save) sends the items for them. The Confirm test fails
-  with the fix removed.
+  with the `savePlan` change removed.
+- `savePlan` takes the incomplete-items flag as a required argument, so the
+  editor can't drop it without failing typecheck. The tests render the
+  editor statically and don't run its save path, so this is the guard for
+  that wiring.
 
 ## Lesson
 
